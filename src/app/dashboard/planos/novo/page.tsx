@@ -1,0 +1,187 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+
+interface Operacao {
+  id: string;
+  nome: string;
+  status: string;
+  om: {
+    nome: string;
+    sigla: string;
+  };
+}
+
+export default function NovoPlanoPage() {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [operacoes, setOperacoes] = useState<Operacao[]>([]);
+  const [loadingOperacoes, setLoadingOperacoes] = useState(true);
+
+  const [formData, setFormData] = useState({
+    titulo: '',
+    operacaoId: '',
+    prioridade: 'MEDIA',
+  });
+
+  useEffect(() => {
+    fetchOperacoes();
+  }, []);
+
+  const fetchOperacoes = async () => {
+    try {
+      const response = await fetch('/api/operacoes');
+      const data = await response.json();
+      setOperacoes(data);
+    } catch (error) {
+      console.error('Error fetching operacoes:', error);
+    } finally {
+      setLoadingOperacoes(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/planos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao criar plano');
+      }
+
+      router.push(`/dashboard/planos/${data.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao criar plano');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="mb-6">
+        <Link
+          href="/dashboard/planos"
+          className="inline-flex items-center text-olive-700 hover:text-military-900 mb-4"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar para Planos
+        </Link>
+        <h1 className="text-3xl font-bold text-military-900">Novo Plano de Trabalho</h1>
+      </div>
+
+      <div className="bg-white rounded-lg border border-olive-200 p-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <Input
+                label="Título do Plano"
+                value={formData.titulo}
+                onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                placeholder="Ex: Plano Logístico Operação CATRIMANI II"
+                required
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-olive-800 mb-1">
+                Operação <span className="text-red-600">*</span>
+              </label>
+              {loadingOperacoes ? (
+                <div className="w-full px-3 py-2 border border-olive-300 rounded-lg bg-military-50 text-olive-700">
+                  Carregando operações...
+                </div>
+              ) : operacoes.length === 0 ? (
+                <div className="space-y-2">
+                  <div className="w-full px-3 py-2 border border-amber-300 rounded-lg bg-amber-50 text-amber-800">
+                    Nenhuma operação disponível
+                  </div>
+                  <Link href="/dashboard/operacoes/nova">
+                    <Button type="button" variant="secondary" size="sm">
+                      Criar Nova Operação
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <select
+                  value={formData.operacaoId}
+                  onChange={(e) => setFormData({ ...formData, operacaoId: e.target.value })}
+                  className="w-full px-3 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 bg-white"
+                  required
+                >
+                  <option value="">Selecione uma operação</option>
+                  {operacoes.map((op) => (
+                    <option key={op.id} value={op.id}>
+                      {op.nome} ({op.om.sigla}) - {op.status}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-olive-800 mb-1">
+                Prioridade <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={formData.prioridade}
+                onChange={(e) => setFormData({ ...formData, prioridade: e.target.value })}
+                className="w-full px-3 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 bg-white"
+                required
+              >
+                <option value="BAIXA">Baixa</option>
+                <option value="MEDIA">Média</option>
+                <option value="ALTA">Alta</option>
+                <option value="CRITICA">Crítica</option>
+              </select>
+            </div>
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div className="bg-military-50 border border-military-200 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-military-900 mb-2">
+              📋 Próximos Passos
+            </h3>
+            <ul className="text-sm text-olive-700 space-y-1">
+              <li>1. Criar o plano de trabalho</li>
+              <li>2. Adicionar itens financeiros (despesas)</li>
+              <li>3. Anexar documentos de referência</li>
+              <li>4. Enviar para análise e aprovação</li>
+            </ul>
+          </div>
+
+          <div className="flex gap-4">
+            <Button type="submit" isLoading={isLoading} disabled={operacoes.length === 0}>
+              Criar Plano de Trabalho
+            </Button>
+            <Link href="/dashboard/planos">
+              <Button type="button" variant="secondary">
+                Cancelar
+              </Button>
+            </Link>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

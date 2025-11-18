@@ -1,0 +1,385 @@
+// ============================================
+// OpsManager - Sistema de Gestão de Operações
+// ============================================
+// Schema Prisma para PostgreSQL
+// Versão: 1.0.0
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum Role {
+  INTEGRANTE_OM
+  CMT_OM
+  CMT_BRIGADA
+  INTEGRANTE_CMA
+  CMT_CMA
+  SUPER_ADMIN
+}
+
+enum TipoOM {
+  COMPANHIA
+  BATALHAO
+  BRIGADA
+  CMA
+  COTER
+}
+
+enum StatusPlano {
+  RASCUNHO
+  EM_ANALISE
+  APROVADO
+  REPROVADO
+}
+
+enum Prioridade {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum TipoEvento {
+  CRIACAO
+  ENVIO_ANALISE
+  APROVACAO
+  REPROVACAO
+  EDICAO
+}
+
+enum AcaoAprovacao {
+  APROVADO
+  REPROVADO
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+// --------------------------------------------
+// Usuários e Autenticação
+// --------------------------------------------
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String   @map("password_hash")
+
+  // Dados pessoais
+  nomeCompleto    String   @map("nome_completo")
+  nomeGuerra      String?  @map("nome_guerra")
+  postoGraduacao  String   @map("posto_graduacao")
+  telefone        String?
+
+  // Controle de acesso
+  role            Role
+  isActive        Boolean  @default(true) @map("is_active")
+
+  // Relacionamentos
+  omId            String   @map("om_id")
+  om              OrganizacaoMilitar @relation(fields: [omId], references: [id], onDelete: Restrict)
+
+  // Relacionamentos reversos
+  planosResponsavel     PlanoTrabalho[]      @relation("PlanoResponsavel")
+  documentosEnviados    DocumentoReferencia[] @relation("DocumentoUploader")
+  anotacoes             Anotacao[]
+  aprovacoes            AprovacaoHistorico[]
+  auditoriaLogs         AuditoriaLog[]
+
+  // Auditoria
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@index([omId])
+  @@index([role])
+  @@map("users")
+}
+
+// --------------------------------------------
+// Estrutura Organizacional
+// --------------------------------------------
+
+model OrganizacaoMilitar {
+  id              String   @id @default(cuid())
+  nome            String
+  sigla           String
+  tipo            TipoOM
+  codUG           String   @unique @map("cod_ug") // Código de Unidade Gestora
+
+  // Hierarquia (self-relation)
+  omPaiId         String?  @map("om_pai_id")
+  omPai           OrganizacaoMilitar?  @relation("HierarquiaOM", fields: [omPaiId], references: [id], onDelete: Restrict)
+  omsFilhas       OrganizacaoMilitar[] @relation("HierarquiaOM")
+
+  // Relacionamentos
+  users           User[]
+  operacoes       Operacao[]
+  itensFinanceiros ItemFinanceiro[]
+
+  // Auditoria
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([codUG])
+  @@index([omPaiId])
+  @@index([tipo])
+  @@map("organizacoes_militares")
+}
+
+// --------------------------------------------
+// Operações
+// --------------------------------------------
+
+model Operacao {
+  id                          String      @id @default(cuid())
+  nome                        String
+  efetivo                     Int         // Número de militares
+  dataInicio                  DateTime    @map("data_inicio")
+  dataFinal                   DateTime    @map("data_final")
+
+  // Status e prioridade
+  status                      StatusPlano @default(RASCUNHO)
+  prioridade                  Prioridade  @default(MEDIA)
+
+  // Campos descritivos
+  finalidade                  String?     @db.Text
+  motivacao                   String?     @db.Text
+  consequenciaNaoAtendimento  String?     @map("consequencia_nao_atendimento") @db.Text
+  observacoes                 String?     @db.Text
+
+  // Relacionamentos
+  omId                        String      @map("om_id")
+  om                          OrganizacaoMilitar @relation(fields: [omId], references: [id], onDelete: Restrict)
+
+  planosTrabalho              PlanoTrabalho[]
+  auditoriaLogs               AuditoriaLog[]
+
+  // Auditoria
+  createdAt                   DateTime    @default(now()) @map("created_at")
+  updatedAt                   DateTime    @updatedAt @map("updated_at")
+
+  @@index([omId])
+  @@index([status])
+  @@index([dataInicio])
+  @@index([dataFinal])
+  @@map("operacoes")
+}
+
+// --------------------------------------------
+// Planos de Trabalho (Documento Central)
+// --------------------------------------------
+
+model PlanoTrabalho {
+  id                String      @id @default(cuid())
+  titulo            String
+  versao            Int         @default(1)
+
+  // Relacionamento com Operação
+  operacaoId        String      @map("operacao_id")
+  operacao          Operacao    @relation(fields: [operacaoId], references: [id], onDelete: Cascade)
+
+  // Responsável
+  responsavelId     String      @map("responsavel_id")
+  responsavel       User        @relation("PlanoResponsavel", fields: [responsavelId], references: [id], onDelete: Restrict)
+
+  // Status e prioridade
+  status            StatusPlano @default(RASCUNHO)
+  prioridade        Prioridade  @default(MEDIA)
+
+  // Relacionamentos
+  itensFinanceiros  ItemFinanceiro[]
+  documentos        DocumentoReferencia[]
+  anotacoes         Anotacao[]
+  historicoAprovacoes AprovacaoHistorico[]
+  auditoriaLogs     AuditoriaLog[]
+
+  // Auditoria
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  @@unique([operacaoId, versao])
+  @@index([operacaoId])
+  @@index([responsavelId])
+  @@index([status])
+  @@map("planos_trabalho")
+}
+
+// --------------------------------------------
+// Itens Financeiros (Células da Matriz)
+// --------------------------------------------
+
+model ItemFinanceiro {
+  id                String      @id @default(cuid())
+  descricao         String      @db.Text
+
+  // Valores (todos obrigatórios)
+  valorUnitario     Decimal     @map("valor_unitario") @db.Decimal(15, 2)
+  quantidade        Decimal     @db.Decimal(15, 3)
+  valorTotal        Decimal     @map("valor_total") @db.Decimal(15, 2)
+
+  // Relacionamentos
+  planoTrabalhoId   String      @map("plano_trabalho_id")
+  planoTrabalho     PlanoTrabalho @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
+
+  // OM específica do item (pode ser diferente da OM da operação)
+  omId              String      @map("om_id")
+  om                OrganizacaoMilitar @relation(fields: [omId], references: [id], onDelete: Restrict)
+
+  // Natureza de Despesa (1:1)
+  naturezaId        String      @map("natureza_id")
+  natureza          NaturezaDespesa @relation(fields: [naturezaId], references: [id], onDelete: Restrict)
+
+  // Auditoria
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  @@index([planoTrabalhoId])
+  @@index([omId])
+  @@index([naturezaId])
+  @@map("itens_financeiros")
+}
+
+// --------------------------------------------
+// Naturezas de Despesa (Fixas)
+// --------------------------------------------
+
+model NaturezaDespesa {
+  id                String      @id @default(cuid())
+  codigo            String      @unique
+  nome              String
+  descricao         String?     @db.Text
+
+  // Relacionamentos
+  itensFinanceiros  ItemFinanceiro[]
+
+  // Auditoria
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  @@index([codigo])
+  @@map("naturezas_despesa")
+}
+
+// --------------------------------------------
+// Documentos de Referência
+// --------------------------------------------
+
+model DocumentoReferencia {
+  id                String      @id @default(cuid())
+  nome              String
+  tipo              String      // PDF, XLSX, etc
+  tamanhoKB         Int?        @map("tamanho_kb")
+  observacao        String?     @db.Text
+
+  // Relacionamentos
+  planoTrabalhoId   String      @map("plano_trabalho_id")
+  planoTrabalho     PlanoTrabalho @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
+
+  uploadedById      String      @map("uploaded_by_id")
+  uploadedBy        User        @relation("DocumentoUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  // Auditoria
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  @@index([planoTrabalhoId])
+  @@map("documentos_referencia")
+}
+
+// --------------------------------------------
+// Anotações (Comentários por Etapa)
+// --------------------------------------------
+
+model Anotacao {
+  id                String      @id @default(cuid())
+  conteudo          String      @db.Text
+  etapaWorkflow     String      @map("etapa_workflow") // Ex: "EM_ANALISE_OM", "APROVACAO_BRIGADA"
+
+  // Relacionamentos
+  planoTrabalhoId   String      @map("plano_trabalho_id")
+  planoTrabalho     PlanoTrabalho @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
+
+  autorId           String      @map("autor_id")
+  autor             User        @relation(fields: [autorId], references: [id], onDelete: Restrict)
+
+  // Auditoria
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  @@index([planoTrabalhoId])
+  @@index([autorId])
+  @@map("anotacoes")
+}
+
+// --------------------------------------------
+// Histórico de Aprovações (Workflow)
+// --------------------------------------------
+
+model AprovacaoHistorico {
+  id                String      @id @default(cuid())
+  acao              AcaoAprovacao
+  motivo            String?     @db.Text
+
+  // Relacionamentos
+  planoTrabalhoId   String      @map("plano_trabalho_id")
+  planoTrabalho     PlanoTrabalho @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
+
+  aprovadorId       String      @map("aprovador_id")
+  aprovador         User        @relation(fields: [aprovadorId], references: [id], onDelete: Restrict)
+
+  // Nível da OM onde ocorreu a aprovação/reprovação
+  omNivelId         String      @map("om_nivel_id")
+
+  // Data da ação
+  dataAcao          DateTime    @default(now()) @map("data_acao")
+
+  // Auditoria
+  createdAt         DateTime    @default(now()) @map("created_at")
+
+  @@index([planoTrabalhoId])
+  @@index([aprovadorId])
+  @@index([dataAcao])
+  @@map("aprovacoes_historico")
+}
+
+// --------------------------------------------
+// Log de Auditoria
+// --------------------------------------------
+
+model AuditoriaLog {
+  id                String      @id @default(cuid())
+  tipoEvento        TipoEvento  @map("tipo_evento")
+  descricao         String      @db.Text
+  metadados         Json?       // Campos antes/depois, dados adicionais
+
+  // Relacionamentos (opcionais)
+  usuarioId         String?     @map("usuario_id")
+  usuario           User?       @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  planoTrabalhoId   String?     @map("plano_trabalho_id")
+  planoTrabalho     PlanoTrabalho? @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
+
+  operacaoId        String?     @map("operacao_id")
+  operacao          Operacao?   @relation(fields: [operacaoId], references: [id], onDelete: Cascade)
+
+  // Timestamp
+  timestamp         DateTime    @default(now())
+
+  @@index([usuarioId])
+  @@index([planoTrabalhoId])
+  @@index([operacaoId])
+  @@index([tipoEvento])
+  @@index([timestamp])
+  @@map("auditoria_logs")
+}

@@ -1,0 +1,285 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/Button';
+import { ArrowLeft, Plus, Calendar, Users, FileText, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+interface Operacao {
+  id: string;
+  nome: string;
+  efetivo: number;
+  dataInicio: string;
+  dataFinal: string;
+  status: string;
+  prioridade: string;
+  finalidade?: string;
+  motivacao?: string;
+  consequenciaNaoAtendimento?: string;
+  observacoes?: string;
+  om: {
+    id: string;
+    nome: string;
+    sigla: string;
+    tipo: string;
+  };
+  planosTrabalho: Array<{
+    id: string;
+    titulo: string;
+    versao: number;
+    status: string;
+    responsavel: {
+      nomeCompleto: string;
+      nomeGuerra?: string;
+      postoGraduacao: string;
+    };
+  }>;
+}
+
+export default function OperacaoDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params?.id as string;
+
+  const [operacao, setOperacao] = useState<Operacao | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (id) {
+      fetchOperacao();
+    }
+  }, [id]);
+
+  const fetchOperacao = async () => {
+    try {
+      const response = await fetch(`/api/operacoes/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setOperacao(data);
+      }
+    } catch (error) {
+      console.error('Error fetching operacao:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors = {
+      RASCUNHO: 'bg-olive-100 text-olive-800',
+      EM_ANALISE: 'bg-amber-100 text-amber-800',
+      APROVADO: 'bg-military-200 text-military-900',
+      REPROVADO: 'bg-red-100 text-red-800',
+    };
+    return colors[status as keyof typeof colors] || 'bg-olive-100 text-olive-800';
+  };
+
+  const getPrioridadeColor = (prioridade: string) => {
+    const colors = {
+      BAIXA: 'bg-military-100 text-military-700',
+      MEDIA: 'bg-amber-100 text-amber-700',
+      ALTA: 'bg-orange-100 text-orange-800',
+      CRITICA: 'bg-red-100 text-red-800',
+    };
+    return colors[prioridade as keyof typeof colors] || 'bg-olive-100 text-olive-800';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-military-600"></div>
+      </div>
+    );
+  }
+
+  if (!operacao) {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-military-900 mb-2">Operação não encontrada</h2>
+        <p className="text-olive-700 mb-6">A operação que você procura não existe ou foi removida</p>
+        <Link href="/dashboard/operacoes">
+          <Button variant="secondary">Voltar para Operações</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <Link
+          href="/dashboard/operacoes"
+          className="inline-flex items-center text-olive-700 hover:text-military-900 mb-4"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar para Operações
+        </Link>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-military-900 mb-2">{operacao.nome}</h1>
+            <p className="text-olive-700">{operacao.om.nome}</p>
+          </div>
+          <div className="flex gap-2">
+            <span
+              className={`px-4 py-2 text-sm font-medium rounded-lg ${getPrioridadeColor(
+                operacao.prioridade
+              )}`}
+            >
+              {operacao.prioridade}
+            </span>
+            <span
+              className={`px-4 py-2 text-sm font-medium rounded-lg ${getStatusColor(
+                operacao.status
+              )}`}
+            >
+              {operacao.status.replace('_', ' ')}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Info Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white p-6 rounded-lg border border-olive-200">
+          <div className="flex items-center gap-3 mb-2">
+            <Users className="w-5 h-5 text-military-600" />
+            <div className="text-sm text-olive-700">Efetivo</div>
+          </div>
+          <div className="text-2xl font-bold text-military-900">{operacao.efetivo}</div>
+          <div className="text-xs text-olive-600 mt-1">militares</div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg border border-olive-200">
+          <div className="flex items-center gap-3 mb-2">
+            <Calendar className="w-5 h-5 text-military-600" />
+            <div className="text-sm text-olive-700">Período</div>
+          </div>
+          <div className="text-lg font-semibold text-military-900">
+            {format(new Date(operacao.dataInicio), 'dd/MM/yyyy')} até{' '}
+            {format(new Date(operacao.dataFinal), 'dd/MM/yyyy')}
+          </div>
+          <div className="text-xs text-olive-600 mt-1">
+            {Math.ceil(
+              (new Date(operacao.dataFinal).getTime() - new Date(operacao.dataInicio).getTime()) /
+                (1000 * 60 * 60 * 24)
+            )}{' '}
+            dias
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg border border-olive-200">
+          <div className="flex items-center gap-3 mb-2">
+            <FileText className="w-5 h-5 text-military-600" />
+            <div className="text-sm text-olive-700">Planos de Trabalho</div>
+          </div>
+          <div className="text-2xl font-bold text-military-900">
+            {operacao.planosTrabalho.length}
+          </div>
+          <div className="text-xs text-olive-600 mt-1">cadastrados</div>
+        </div>
+      </div>
+
+      {/* Campos Descritivos */}
+      {(operacao.finalidade ||
+        operacao.motivacao ||
+        operacao.consequenciaNaoAtendimento ||
+        operacao.observacoes) && (
+        <div className="bg-white rounded-lg border border-olive-200 p-6 mb-6">
+          <h2 className="text-xl font-semibold text-military-900 mb-4">Detalhes da Operação</h2>
+
+          <div className="space-y-4">
+            {operacao.finalidade && (
+              <div>
+                <h3 className="text-sm font-semibold text-military-700 mb-2">Finalidade</h3>
+                <p className="text-olive-800 whitespace-pre-wrap">{operacao.finalidade}</p>
+              </div>
+            )}
+
+            {operacao.motivacao && (
+              <div>
+                <h3 className="text-sm font-semibold text-military-700 mb-2">Motivação</h3>
+                <p className="text-olive-800 whitespace-pre-wrap">{operacao.motivacao}</p>
+              </div>
+            )}
+
+            {operacao.consequenciaNaoAtendimento && (
+              <div>
+                <h3 className="text-sm font-semibold text-military-700 mb-2">
+                  Consequência do Não Atendimento
+                </h3>
+                <p className="text-olive-800 whitespace-pre-wrap">
+                  {operacao.consequenciaNaoAtendimento}
+                </p>
+              </div>
+            )}
+
+            {operacao.observacoes && (
+              <div>
+                <h3 className="text-sm font-semibold text-military-700 mb-2">Observações</h3>
+                <p className="text-olive-800 whitespace-pre-wrap">{operacao.observacoes}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Planos de Trabalho */}
+      <div className="bg-white rounded-lg border border-olive-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-military-900">Planos de Trabalho</h2>
+          <Link href={`/dashboard/planos/novo?operacaoId=${operacao.id}`}>
+            <Button size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Plano
+            </Button>
+          </Link>
+        </div>
+
+        {operacao.planosTrabalho.length === 0 ? (
+          <div className="text-center py-12">
+            <FileText className="w-12 h-12 text-olive-400 mx-auto mb-4" />
+            <p className="text-olive-700 mb-4">Nenhum plano de trabalho cadastrado</p>
+            <Link href={`/dashboard/planos/novo?operacaoId=${operacao.id}`}>
+              <Button variant="secondary" size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Criar Primeiro Plano
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {operacao.planosTrabalho.map((plano) => (
+              <Link
+                key={plano.id}
+                href={`/dashboard/planos/${plano.id}`}
+                className="flex items-center justify-between p-4 border border-olive-200 rounded-lg hover:bg-military-50 hover:border-military-400 transition-all"
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-medium text-military-900">{plano.titulo}</h3>
+                    <span className="text-xs text-olive-600">v{plano.versao}</span>
+                  </div>
+                  <p className="text-sm text-olive-700">
+                    {plano.responsavel.postoGraduacao}{' '}
+                    {plano.responsavel.nomeGuerra || plano.responsavel.nomeCompleto}
+                  </p>
+                </div>
+                <span
+                  className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                    plano.status
+                  )}`}
+                >
+                  {plano.status.replace('_', ' ')}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

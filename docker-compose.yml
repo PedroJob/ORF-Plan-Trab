@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: opsmanager-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: opsmanager
+      POSTGRES_PASSWORD: opsmanager_password_change_in_production
+      POSTGRES_DB: opsmanager
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - opsmanager-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opsmanager -d opsmanager"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # OpsManager Application
+  # ============================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: opsmanager-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://opsmanager:opsmanager_password_change_in_production@postgres:5432/opsmanager?schema=public
+      - JWT_SECRET=change-this-to-a-secure-random-string-in-production
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    ports:
+      - "3000:3000"
+    networks:
+      - opsmanager-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  opsmanager-network:
+    driver: bridge
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  postgres_data:
+    driver: local
