@@ -28,6 +28,7 @@ export default function NovoPlanoPage() {
     titulo: '',
     operacaoId: '',
     prioridade: 'MEDIA',
+    tipo: 'LOGISTICO',
   });
 
   useEffect(() => {
@@ -136,6 +137,27 @@ export default function NovoPlanoPage() {
 
             <div>
               <label className="block text-sm font-medium text-olive-800 mb-1">
+                Tipo de Plano <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={formData.tipo}
+                onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                className="w-full px-3 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 bg-white"
+                required
+              >
+                <option value="LOGISTICO">Logístico</option>
+                <option value="OPERACIONAL_GND3" disabled>Operacional GND3 (Em desenvolvimento)</option>
+                <option value="OPERACIONAL_GND4" disabled>Operacional GND4 (Em desenvolvimento)</option>
+                <option value="RACAO_R2" disabled>Ração R2 (Em desenvolvimento)</option>
+                <option value="MUNICAO" disabled>Munição (Em desenvolvimento)</option>
+              </select>
+              <p className="text-xs text-olive-600 mt-1">
+                Atualmente apenas planos Logísticos estão disponíveis
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-olive-800 mb-1">
                 Prioridade <span className="text-red-600">*</span>
               </label>
               <select
@@ -164,7 +186,7 @@ export default function NovoPlanoPage() {
             </h3>
             <ul className="text-sm text-olive-700 space-y-1">
               <li>1. Criar o plano de trabalho</li>
-              <li>2. Adicionar itens financeiros (despesas)</li>
+              <li>2. Adicionar despesass</li>
               <li>3. Anexar documentos de referência</li>
               <li>4. Enviar para análise e aprovação</li>
             </ul>

@@ -1,0 +1,10 @@
+export { FormularioClasseI } from './FormularioClasseI';
+export { FormularioClasseII } from './FormularioClasseII';
+export { FormularioClasseIII } from './FormularioClasseIII';
+export { FormularioClasseIV } from './FormularioClasseIV';
+export { FormularioClasseV } from './FormularioClasseV';
+export { FormularioClasseVI } from './FormularioClasseVI';
+export { FormularioClasseVII } from './FormularioClasseVII';
+export { FormularioClasseVIII } from './FormularioClasseVIII';
+export { FormularioClasseIX } from './FormularioClasseIX';
+export { FormularioClasseX } from './FormularioClasseX';

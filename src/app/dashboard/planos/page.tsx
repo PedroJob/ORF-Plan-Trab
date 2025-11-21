@@ -27,9 +27,9 @@ interface PlanoTrabalho {
     nomeGuerra?: string;
     postoGraduacao: string;
   };
-  itensFinanceiros: Array<{ id: string; valorTotal: number }>;
+  despesas: Array<{ id: string; valorCalculado: number }>;
   _count: {
-    itensFinanceiros: number;
+    despesas: number;
     documentos: number;
     anotacoes: number;
   };
@@ -50,9 +50,11 @@ export default function PlanosPage() {
     try {
       const response = await fetch('/api/planos');
       const data = await response.json();
-      setPlanos(data);
+      // Garantir que sempre seja um array
+      setPlanos(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching planos:', error);
+      setPlanos([]);
     } finally {
       setIsLoading(false);
     }
@@ -78,8 +80,8 @@ export default function PlanosPage() {
     return colors[prioridade as keyof typeof colors] || 'bg-olive-100 text-olive-800';
   };
 
-  const calcularTotal = (itens: Array<{ valorTotal: number }>) => {
-    return itens.reduce((sum, item) => sum + Number(item.valorTotal), 0);
+  const calcularTotal = (despesas: Array<{ valorCalculado: number }>) => {
+    return despesas.reduce((sum, despesa) => sum + Number(despesa.valorCalculado), 0);
   };
 
   const formatCurrency = (value: number) => {
@@ -237,7 +239,7 @@ export default function PlanosPage() {
                 </div>
                 <div className="flex items-center text-sm text-olive-700">
                   <FileText className="w-4 h-4 mr-2" />
-                  {plano._count.itensFinanceiros} itens financeiros
+                  {plano._count.despesas} despesas
                 </div>
                 <div className="flex items-center text-sm text-olive-700">
                   <Calendar className="w-4 h-4 mr-2" />
@@ -252,7 +254,7 @@ export default function PlanosPage() {
                   {plano._count.documentos} documento(s) • {plano._count.anotacoes} anotação(ões)
                 </div>
                 <div className="text-lg font-bold text-military-700">
-                  {formatCurrency(calcularTotal(plano.itensFinanceiros))}
+                  {formatCurrency(calcularTotal(plano.despesas))}
                 </div>
               </div>
             </Link>

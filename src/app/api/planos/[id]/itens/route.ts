@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { z } from 'zod';
 
-const createItemSchema = z.object({
-  descricao: z.string().min(1, 'Descrição é obrigatória'),
-  valorUnitario: z.number().positive('Valor unitário deve ser positivo'),
-  quantidade: z.number().positive('Quantidade deve ser positiva'),
-  valorTotal: z.number().positive('Valor total deve ser positivo'),
-  omId: z.string().cuid('ID de OM inválido'),
-  naturezaId: z.string().cuid('ID de natureza inválido'),
-});
-
+/**
+ * GET /api/planos/[id]/itens
+ * Lista todas as despesas de um plano (rota legada para compatibilidade)
+ * NOTA: Para planos LOGISTICO, use /api/planos/[id]/despesas
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -24,29 +19,62 @@ export async function GET(
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
-    const itens = await prisma.itemFinanceiro.findMany({
+    // Verificar se plano existe
+    const plano = await prisma.planoTrabalho.findUnique({
+      where: { id },
+      select: { tipo: true },
+    });
+
+    if (!plano) {
+      return NextResponse.json(
+        { error: 'Plano de trabalho não encontrado' },
+        { status: 404 }
+      );
+    }
+
+    // Se for plano LOGISTICO, redirecionar para endpoint de despesas
+    if (plano.tipo === 'LOGISTICO') {
+      return NextResponse.json(
+        {
+          error: 'Para planos LOGISTICO, use o endpoint /api/planos/[id]/despesas',
+          redirectTo: `/api/planos/${id}/despesas`
+        },
+        { status: 301 }
+      );
+    }
+
+    // Para outros tipos de plano, buscar despesas básicas
+    const despesas = await prisma.despesa.findMany({
       where: { planoTrabalhoId: id },
       include: {
-        om: {
+        classe: {
           select: {
-            id: true,
             nome: true,
-            sigla: true,
-            codUG: true,
+            descricao: true,
           },
         },
-        natureza: {
+        tipo: {
           select: {
-            id: true,
-            codigo: true,
             nome: true,
+          },
+        },
+        oms: {
+          include: {
+            om: {
+              select: {
+                id: true,
+                nome: true,
+                sigla: true,
+                codUG: true,
+              },
+            },
           },
         },
       },
       orderBy: { createdAt: 'asc' },
     });
 
-    return NextResponse.json(itens);
+    return NextResponse.json(despesas);
   } catch (error) {
     console.error('Get itens error:', error);
     return NextResponse.json(
@@ -56,8 +84,12 @@ export async function GET(
   }
 }
 
+/**
+ * POST /api/planos/[id]/itens
+ * Rota deprecada - use /api/planos/[id]/despesas
+ */
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -68,10 +100,10 @@ export async function POST(
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
-    // Verificar se plano existe e se usuário tem permissão
+    // Verificar se plano existe
     const plano = await prisma.planoTrabalho.findUnique({
       where: { id },
-      include: { operacao: true },
+      select: { tipo: true },
     });
 
     if (!plano) {
@@ -81,61 +113,14 @@ export async function POST(
       );
     }
 
-    // Apenas responsável ou superior pode adicionar itens
-    const user = await prisma.user.findUnique({
-      where: { id: currentUser.userId },
-    });
-
-    if (!user || (plano.responsavelId !== user.id && !['CMT_OM', 'CMT_BRIGADA', 'CMT_CMA', 'SUPER_ADMIN'].includes(user.role))) {
-      return NextResponse.json(
-        { error: 'Sem permissão para adicionar itens' },
-        { status: 403 }
-      );
-    }
-
-    const body = await request.json();
-    const validation = createItemSchema.safeParse(body);
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Dados inválidos', details: validation.error.errors },
-        { status: 400 }
-      );
-    }
-
-    const data = validation.data;
-
-    // Criar item financeiro
-    const item = await prisma.itemFinanceiro.create({
-      data: {
-        descricao: data.descricao,
-        valorUnitario: data.valorUnitario,
-        quantidade: data.quantidade,
-        valorTotal: data.valorTotal,
-        planoTrabalhoId: id,
-        omId: data.omId,
-        naturezaId: data.naturezaId,
+    // Este endpoint está deprecado
+    return NextResponse.json(
+      {
+        error: 'Este endpoint está deprecado. Use /api/planos/[id]/despesas para criar despesas.',
+        redirectTo: `/api/planos/${id}/despesas`
       },
-      include: {
-        om: {
-          select: {
-            id: true,
-            nome: true,
-            sigla: true,
-            codUG: true,
-          },
-        },
-        natureza: {
-          select: {
-            id: true,
-            codigo: true,
-            nome: true,
-          },
-        },
-      },
-    });
-
-    return NextResponse.json(item, { status: 201 });
+      { status: 410 }
+    );
   } catch (error) {
     console.error('Create item error:', error);
     return NextResponse.json(

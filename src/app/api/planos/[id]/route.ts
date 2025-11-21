@@ -18,7 +18,12 @@ export async function GET(
       where: { id },
       include: {
         operacao: {
-          include: {
+          select: {
+            id: true,
+            nome: true,
+            efetivo: true,
+            dataInicio: true,
+            dataFinal: true,
             om: {
               select: {
                 id: true,
@@ -37,16 +42,16 @@ export async function GET(
             postoGraduacao: true,
           },
         },
-        itensFinanceiros: {
+        despesas: {
           select: {
             id: true,
-            valorTotal: true,
+            valorCalculado: true,
           },
         },
         _count: {
           select: {
-            itensFinanceiros: true,
-            documentos: true,
+            despesas: true,
+            documentosReferencia: true,
             anotacoes: true,
           },
         },

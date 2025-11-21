@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Plan Trab Manager",
+  title: "SisPTrab",
   description: "Sistema de gestão de operações militares e planos de trabalho",
 };
 

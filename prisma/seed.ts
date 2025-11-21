@@ -12,7 +12,10 @@ async function main() {
   await prisma.aprovacaoHistorico.deleteMany();
   await prisma.anotacao.deleteMany();
   await prisma.documentoReferencia.deleteMany();
-  await prisma.itemFinanceiro.deleteMany();
+  await prisma.despesaOM.deleteMany();
+  await prisma.despesa.deleteMany();
+  await prisma.tipo.deleteMany();
+  await prisma.classe.deleteMany();
   await prisma.naturezaDespesa.deleteMany();
   await prisma.planoTrabalho.deleteMany();
   await prisma.operacao.deleteMany();
@@ -170,31 +173,218 @@ async function main() {
   });
   console.log('  ✓ Integrante OM criado (integrante@eb.mil.br / senha123)');
 
-  // Criar naturezas de despesa
+  // Criar naturezas de despesa (apenas as 2 válidas)
   console.log('\n💰 Criando naturezas de despesa...');
 
   const naturezas = [
-    { codigo: 'GND-3-01', nome: 'Gêneros Alimentícios', descricao: 'Aquisição de gêneros alimentícios para complemento da alimentação' },
-    { codigo: 'GND-3-02', nome: 'Combustível', descricao: 'Aquisição de combustível para viaturas e geradores' },
-    { codigo: 'GND-3-03', nome: 'Manutenção de Comunicações/TI', descricao: 'Manutenção de equipamentos de comunicações, eletrônica e informática' },
-    { codigo: 'GND-3-04', nome: 'Manutenção de Viaturas', descricao: 'Aquisição de peças e serviços para manutenção de viaturas' },
-    { codigo: 'GND-3-05', nome: 'Manutenção de Embarcações', descricao: 'Aquisição de peças e serviços para embarcações' },
-    { codigo: 'GND-3-06', nome: 'Suprimento de Fundos', descricao: 'Despesas eventuais e inopinadas' },
-    { codigo: 'GND-3-07', nome: 'Diárias', descricao: 'Pagamento de diárias a militares' },
-    { codigo: 'GND-3-08', nome: 'Passagens', descricao: 'Aquisição de passagem aérea e rodoviária' },
-    { codigo: 'GND-3-09', nome: 'Locação de Veículos', descricao: 'Locação de veículos para transporte' },
-    { codigo: 'GND-3-10', nome: 'Manutenção de Ar Condicionado', descricao: 'Serviços de manutenção de ar condicionado' },
-    { codigo: 'GND-3-11', nome: 'Telecomunicações', descricao: 'Serviços de telecomunicações via satélite' },
-    { codigo: 'GND-3-12', nome: 'Fretamento Aéreo', descricao: 'Contratação de fretamento aéreo' },
-    { codigo: 'GND-3-13', nome: 'Materiais de Consumo', descricao: 'Aquisição de materiais de consumo diversos' },
-    { codigo: 'GND-3-14', nome: 'Materiais de Higiene e Limpeza', descricao: 'Aquisição de materiais de higiene e limpeza' },
-    { codigo: 'GND-3-15', nome: 'Verba Operacional de Inteligência', descricao: 'Custeio de atividades de inteligência' },
+    {
+      codigo: '33.90.30',
+      nome: 'Material de Consumo',
+      descricao: 'Despesas com aquisição de materiais de consumo destinados à manutenção de bens imóveis e/ou serviços'
+    },
+    {
+      codigo: '33.90.39',
+      nome: 'Outros Serviços de Terceiros - Pessoa Jurídica',
+      descricao: 'Despesas com aquisição de serviços eventuais de pessoas jurídicas'
+    },
   ];
 
   for (const nat of naturezas) {
     await prisma.naturezaDespesa.create({ data: nat });
   }
   console.log(`  ✓ ${naturezas.length} naturezas de despesa criadas`);
+
+  // Criar Classes (I a X) para Planos LOGISTICO
+  console.log('\n📚 Criando classes de despesa...');
+
+  const classeI = await prisma.classe.create({
+    data: {
+      nome: 'CLASSE_I',
+      descricao: 'Material de Subsistência',
+      naturezasPermitidas: ['33.90.30'],
+      possuiCalculoAutomatizado: true,
+    },
+  });
+
+  const classeII = await prisma.classe.create({
+    data: {
+      nome: 'CLASSE_II',
+      descricao: 'Manutenção de Material de Intendência',
+      naturezasPermitidas: ['33.90.30', '33.90.39'],
+      possuiCalculoAutomatizado: true,
+    },
+  });
+
+  const classeIII = await prisma.classe.create({
+    data: {
+      nome: 'CLASSE_III',
+      descricao: 'Combustíveis e Lubrificantes',
+      naturezasPermitidas: ['33.90.30'],
+      possuiCalculoAutomatizado: true,
+    },
+  });
+
+  const classeIV = await prisma.classe.create({
+    data: {
+      nome: 'CLASSE_IV',
+      descricao: 'Material de Construção',
+      naturezasPermitidas: ['33.90.30', '33.90.39'],
+      possuiCalculoAutomatizado: true,
+    },
+  });
+
+  const classeV = await prisma.classe.create({
+    data: {
+      nome: 'CLASSE_V',
+      descricao: 'Munição e Explosivos',
+      naturezasPermitidas: ['33.90.30'],
+      possuiCalculoAutomatizado: true,
+    },
+  });
+
+  const classeVI = await prisma.classe.create({
+    data: {
+      nome: 'CLASSE_VI',
+      descricao: 'Material Individual',
+      naturezasPermitidas: ['33.90.30'],
+      possuiCalculoAutomatizado: true,
+    },
+  });
+
+  const classeVII = await prisma.classe.create({
+    data: {
+      nome: 'CLASSE_VII',
+      descricao: 'Equipamento Principal',
+      naturezasPermitidas: ['33.90.30', '33.90.39'],
+      possuiCalculoAutomatizado: true,
+    },
+  });
+
+  const classeVIII = await prisma.classe.create({
+    data: {
+      nome: 'CLASSE_VIII',
+      descricao: 'Material de Saúde',
+      naturezasPermitidas: ['33.90.30', '33.90.39'],
+      possuiCalculoAutomatizado: true,
+    },
+  });
+
+  const classeIX = await prisma.classe.create({
+    data: {
+      nome: 'CLASSE_IX',
+      descricao: 'Manutenção de Viaturas',
+      naturezasPermitidas: ['33.90.30', '33.90.39'],
+      possuiCalculoAutomatizado: true,
+    },
+  });
+
+  const classeX = await prisma.classe.create({
+    data: {
+      nome: 'CLASSE_X',
+      descricao: 'Material Não Classificado',
+      naturezasPermitidas: ['33.90.30', '33.90.39'],
+      possuiCalculoAutomatizado: true,
+    },
+  });
+
+  console.log('  ✓ 10 classes criadas');
+
+  // Criar Tipos padrão para cada classe
+  console.log('\n🏷️  Criando tipos de despesa...');
+
+  // Classe I - Material de Subsistência
+  await prisma.tipo.createMany({
+    data: [
+      { nome: 'QR (Quota de Rancho)', classeId: classeI.id, isCombustivel: false, isCriavelUsuario: true },
+      { nome: 'QS (Quota de Subsistência)', classeId: classeI.id, isCombustivel: false, isCriavelUsuario: true },
+    ],
+  });
+
+  // Classe II - Manutenção de Material de Intendência
+  await prisma.tipo.create({
+    data: {
+      nome: 'Manutenção de Material de Intendência',
+      classeId: classeII.id,
+      isCombustivel: false,
+      isCriavelUsuario: true
+    },
+  });
+
+  // Classe III - Combustíveis (não criáveis pelo usuário)
+  await prisma.tipo.createMany({
+    data: [
+      { nome: 'Óleo Diesel', classeId: classeIII.id, isCombustivel: true, isCriavelUsuario: false },
+      { nome: 'Gasolina', classeId: classeIII.id, isCombustivel: true, isCriavelUsuario: false },
+      { nome: 'QAV (Querosene de Aviação)', classeId: classeIII.id, isCombustivel: true, isCriavelUsuario: false },
+      { nome: 'Lubrificantes', classeId: classeIII.id, isCombustivel: false, isCriavelUsuario: true },
+    ],
+  });
+
+  // Classe IV - Material de Construção
+  await prisma.tipo.create({
+    data: {
+      nome: 'Material de Construção',
+      classeId: classeIV.id,
+      isCombustivel: false,
+      isCriavelUsuario: true
+    },
+  });
+
+  // Classe V - Munição e Explosivos
+  await prisma.tipo.createMany({
+    data: [
+      { nome: 'Munição de Instrução', classeId: classeV.id, isCombustivel: false, isCriavelUsuario: true },
+      { nome: 'Munição de Combate', classeId: classeV.id, isCombustivel: false, isCriavelUsuario: true },
+      { nome: 'Explosivos', classeId: classeV.id, isCombustivel: false, isCriavelUsuario: true },
+    ],
+  });
+
+  // Classe VI - Material Individual
+  await prisma.tipo.createMany({
+    data: [
+      { nome: 'Fardamento', classeId: classeVI.id, isCombustivel: false, isCriavelUsuario: true },
+      { nome: 'Equipamento Individual', classeId: classeVI.id, isCombustivel: false, isCriavelUsuario: true },
+      { nome: 'Material de Campanha', classeId: classeVI.id, isCombustivel: false, isCriavelUsuario: true },
+    ],
+  });
+
+  // Classe VII - Equipamento Principal
+  await prisma.tipo.createMany({
+    data: [
+      { nome: 'Aquisição de Equipamento', classeId: classeVII.id, isCombustivel: false, isCriavelUsuario: true },
+      { nome: 'Manutenção de Equipamento', classeId: classeVII.id, isCombustivel: false, isCriavelUsuario: true },
+    ],
+  });
+
+  // Classe VIII - Material de Saúde
+  await prisma.tipo.createMany({
+    data: [
+      { nome: 'Medicamentos', classeId: classeVIII.id, isCombustivel: false, isCriavelUsuario: true },
+      { nome: 'Material Médico-Hospitalar', classeId: classeVIII.id, isCombustivel: false, isCriavelUsuario: true },
+      { nome: 'Equipamento Médico', classeId: classeVIII.id, isCombustivel: false, isCriavelUsuario: true },
+    ],
+  });
+
+  // Classe IX - Manutenção de Viaturas
+  await prisma.tipo.createMany({
+    data: [
+      { nome: 'Manutenção GP1', classeId: classeIX.id, isCombustivel: false, isCriavelUsuario: true },
+      { nome: 'Manutenção GP2', classeId: classeIX.id, isCombustivel: false, isCriavelUsuario: true },
+      { nome: 'Manutenção GP3', classeId: classeIX.id, isCombustivel: false, isCriavelUsuario: true },
+    ],
+  });
+
+  // Classe X - Material Não Classificado
+  await prisma.tipo.create({
+    data: {
+      nome: 'Material Não Classificado',
+      classeId: classeX.id,
+      isCombustivel: false,
+      isCriavelUsuario: true
+    },
+  });
+
+  console.log('  ✓ Tipos de despesa criados para todas as classes');
 
   // Criar operação de exemplo
   console.log('\n🎯 Criando operação de exemplo...');

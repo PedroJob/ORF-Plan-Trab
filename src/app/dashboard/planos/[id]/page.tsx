@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ArrowLeft, Plus, Trash2, Check, X } from 'lucide-react';
 import Link from 'next/link';
+import { DespesasLogistico } from '@/components/despesas/DespesasLogistico';
 
 interface ItemFinanceiro {
   id: string;
@@ -32,9 +33,13 @@ interface PlanoTrabalho {
   versao: number;
   status: string;
   prioridade: string;
+  tipo: string;
   operacao: {
     id: string;
     nome: string;
+    efetivo: number;
+    dataInicio: string;
+    dataFinal: string;
     om: {
       id: string;
       nome: string;
@@ -290,15 +295,24 @@ export default function PlanoTrabalhoPage() {
         </div>
       </div>
 
-      {/* Itens Financeiros */}
+      {/* Despesas - Condicional por Tipo */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Itens Financeiros</h2>
-          <Button size="sm" onClick={() => setShowAddItem(!showAddItem)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Adicionar Item
-          </Button>
-        </div>
+        {plano.tipo === 'LOGISTICO' ? (
+          <DespesasLogistico
+            planoId={id}
+            oms={oms}
+            operacao={plano.operacao}
+            canEdit={plano.status === 'RASCUNHO'}
+          />
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Despesas</h2>
+              <Button size="sm" onClick={() => setShowAddItem(!showAddItem)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar
+              </Button>
+            </div>
 
         {showAddItem && (
           <form onSubmit={handleAddItem} className="mb-6 p-4 bg-military-50 rounded-lg space-y-4 border border-military-200">
@@ -449,6 +463,8 @@ export default function PlanoTrabalhoPage() {
             </tfoot>
           </table>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -66,16 +66,16 @@ export async function GET(request: NextRequest) {
             postoGraduacao: true,
           },
         },
-        itensFinanceiros: {
+        despesas: {
           select: {
             id: true,
-            valorTotal: true,
+            valorCalculado: true,
           },
         },
         _count: {
           select: {
-            itensFinanceiros: true,
-            documentos: true,
+            despesas: true,
+            documentosReferencia: true,
             anotacoes: true,
           },
         },

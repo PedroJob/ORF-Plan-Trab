@@ -37,12 +37,16 @@ export default function DashboardPage() {
       const operacoes = await operacoesRes.json();
       const planos = await planosRes.json();
 
+      // Verificar se planos é um array
+      const planosArray = Array.isArray(planos) ? planos : [];
+      const operacoesArray = Array.isArray(operacoes) ? operacoes : [];
+
       setStats({
-        totalOperacoes: operacoes.length,
-        totalPlanos: planos.length,
-        planosAprovados: planos.filter((p: any) => p.status === 'APROVADO').length,
-        planosEmAnalise: planos.filter((p: any) => p.status === 'EM_ANALISE').length,
-        planosReprovados: planos.filter((p: any) => p.status === 'REPROVADO').length,
+        totalOperacoes: operacoesArray.length,
+        totalPlanos: planosArray.length,
+        planosAprovados: planosArray.filter((p: any) => p.status === 'APROVADO').length,
+        planosEmAnalise: planosArray.filter((p: any) => p.status === 'EM_ANALISE').length,
+        planosReprovados: planosArray.filter((p: any) => p.status === 'REPROVADO').length,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
