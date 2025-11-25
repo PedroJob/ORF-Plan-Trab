@@ -14,7 +14,8 @@ export default function NovaOperacaoPage() {
 
   const [formData, setFormData] = useState({
     nome: '',
-    efetivo: '',
+    efetivoMil: '',
+    efetivoExt: '',
     dataInicio: '',
     dataFinal: '',
     prioridade: 'MEDIA',
@@ -35,7 +36,8 @@ export default function NovaOperacaoPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          efetivo: parseInt(formData.efetivo),
+          efetivoMil: parseInt(formData.efetivoMil),
+          efetivoExt: formData.efetivoExt ? parseInt(formData.efetivoExt) : undefined,
           dataInicio: new Date(formData.dataInicio).toISOString(),
           dataFinal: new Date(formData.dataFinal).toISOString(),
         }),
@@ -81,8 +83,17 @@ export default function NovaOperacaoPage() {
             <Input
               label="Efetivo (militares)"
               type="number"
-              value={formData.efetivo}
-              onChange={(e) => setFormData({ ...formData, efetivo: e.target.value })}
+              value={formData.efetivoMil}
+              onChange={(e) => setFormData({ ...formData, efetivoMil: e.target.value })}
+              placeholder="500"
+              min="1"
+              required
+            />
+            <Input
+              label="Efetivo (agentes externos)"
+              type="number"
+              value={formData.efetivoExt}
+              onChange={(e) => setFormData({ ...formData, efetivoExt: e.target.value })}
               placeholder="500"
               min="1"
               required
@@ -105,6 +116,8 @@ export default function NovaOperacaoPage() {
               </select>
             </div>
 
+            <br />
+
             <Input
               label="Data de Início"
               type="date"
@@ -120,60 +133,6 @@ export default function NovaOperacaoPage() {
               onChange={(e) => setFormData({ ...formData, dataFinal: e.target.value })}
               required
             />
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Finalidade
-              </label>
-              <textarea
-                value={formData.finalidade}
-                onChange={(e) => setFormData({ ...formData, finalidade: e.target.value })}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Descreva a finalidade da operação..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Motivação
-              </label>
-              <textarea
-                value={formData.motivacao}
-                onChange={(e) => setFormData({ ...formData, motivacao: e.target.value })}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Descreva a motivação para a operação..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Consequência do Não Atendimento
-              </label>
-              <textarea
-                value={formData.consequenciaNaoAtendimento}
-                onChange={(e) => setFormData({ ...formData, consequenciaNaoAtendimento: e.target.value })}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Descreva as consequências..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Observações
-              </label>
-              <textarea
-                value={formData.observacoes}
-                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Observações adicionais..."
-              />
-            </div>
           </div>
 
           {error && (

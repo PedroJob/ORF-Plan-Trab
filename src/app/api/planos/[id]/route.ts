@@ -21,7 +21,8 @@ export async function GET(
           select: {
             id: true,
             nome: true,
-            efetivo: true,
+            efetivoMil: true,
+            efetivoExt: true,
             dataInicio: true,
             dataFinal: true,
             om: {

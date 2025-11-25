@@ -2,21 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { X, Plus, AlertCircle, CheckCircle } from 'lucide-react';
-
-interface OM {
-  id: string;
-  nome: string;
-  sigla: string;
-  codUG: string;
-}
-
-interface RateioOM {
-  omId: string;
-  percentual: number;
-}
+import type { OMSelect, RateioOM } from '@/types/despesas';
 
 interface RateioOMsProps {
-  oms: OM[];
+  oms: OMSelect[];
   value: RateioOM[];
   onChange: (rateio: RateioOM[]) => void;
   error?: string;

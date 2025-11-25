@@ -7,7 +7,8 @@ import { StatusPlano, Prioridade, TipoEvento } from '@prisma/client';
 
 const createOperacaoSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
-  efetivo: z.number().int().positive('Efetivo deve ser positivo'),
+  efetivoMil: z.number().int().positive('Efetivo deve ser positivo'),
+  efetivoExt: z.number().int().positive('Efetivo deve ser positivo').optional(),
   dataInicio: z.string().datetime(),
   dataFinal: z.string().datetime(),
   prioridade: z.nativeEnum(Prioridade).optional(),
@@ -104,7 +105,8 @@ export async function POST(request: NextRequest) {
     const operacao = await prisma.operacao.create({
       data: {
         nome: data.nome,
-        efetivo: data.efetivo,
+        efetivoMil: data.efetivoMil,
+        efetivoExt: data.efetivoExt || null,
         dataInicio: new Date(data.dataInicio),
         dataFinal: new Date(data.dataFinal),
         prioridade: data.prioridade || Prioridade.MEDIA,
@@ -130,11 +132,12 @@ export async function POST(request: NextRequest) {
         metadados: {
           operacao: {
             nome: operacao.nome,
-            efetivo: operacao.efetivo,
+            efetivoMil: operacao.efetivoMil,
+            efetivoExt: operacao.efetivoExt,
           },
         },
       },
-    });
+    });3
 
     return NextResponse.json(operacao, { status: 201 });
   } catch (error) {

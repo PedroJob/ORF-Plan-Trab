@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { PreviewCalculo } from '../PreviewCalculo';
+import { useState, useEffect } from "react";
+import { PreviewCalculo } from "../PreviewCalculo";
+import { HandleParametrosChange } from "../ModalCriarDespesa";
 
 interface ParametrosClasseVIII {
   quantidadeMaterial: number;
@@ -12,10 +13,13 @@ interface ParametrosClasseVIII {
 
 interface FormularioClasseVIIIProps {
   value: ParametrosClasseVIII | null;
-  onChange: (params: ParametrosClasseVIII, valorTotal: number, valorCombustivel?: number) => void;
+  onChange: (params: HandleParametrosChange) => void;
 }
 
-export function FormularioClasseVIII({ value, onChange }: FormularioClasseVIIIProps) {
+export function FormularioClasseVIII({
+  value,
+  onChange,
+}: FormularioClasseVIIIProps) {
   const [params, setParams] = useState<ParametrosClasseVIII>(
     value || {
       quantidadeMaterial: 0,
@@ -33,7 +37,12 @@ export function FormularioClasseVIII({ value, onChange }: FormularioClasseVIIIPr
   }, [params]);
 
   const calcular = () => {
-    const { quantidadeMaterial, valorUnitarioMaterial, incluiServicos, custoServicos } = params;
+    const {
+      quantidadeMaterial,
+      valorUnitarioMaterial,
+      incluiServicos,
+      custoServicos,
+    } = params;
 
     if (quantidadeMaterial <= 0 || valorUnitarioMaterial <= 0) {
       setValorTotal(null);
@@ -61,11 +70,11 @@ export function FormularioClasseVIII({ value, onChange }: FormularioClasseVIIIPr
 
     setValorTotal(totalFinal);
     setDetalhes(detalhesCalculo);
-    onChange(params, totalFinal);
+    onChange({ params, valor: totalFinal, descricao: detalhesCalculo });
   };
 
   const handleChange = (field: keyof ParametrosClasseVIII, value: any) => {
-    setParams(prev => ({ ...prev, [field]: value }));
+    setParams((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -79,26 +88,35 @@ export function FormularioClasseVIII({ value, onChange }: FormularioClasseVIIIPr
             type="number"
             min="1"
             step="1"
-            value={params.quantidadeMaterial || ''}
-            onChange={(e) => handleChange('quantidadeMaterial', parseInt(e.target.value) || 0)}
+            value={params.quantidadeMaterial || ""}
+            onChange={(e) =>
+              handleChange("quantidadeMaterial", parseInt(e.target.value) || 0)
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
             placeholder="Número de unidades"
           />
           <p className="text-xs text-gray-500 mt-1">
-            Quantidade de material de saúde (medicamentos, equipamentos médicos, etc.)
+            Quantidade de material de saúde (medicamentos, equipamentos médicos,
+            etc.)
           </p>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Valor Unitário do Material (R$) <span className="text-red-500">*</span>
+            Valor Unitário do Material (R$){" "}
+            <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
             min="0"
             step="0.01"
-            value={params.valorUnitarioMaterial || ''}
-            onChange={(e) => handleChange('valorUnitarioMaterial', parseFloat(e.target.value) || 0)}
+            value={params.valorUnitarioMaterial || ""}
+            onChange={(e) =>
+              handleChange(
+                "valorUnitarioMaterial",
+                parseFloat(e.target.value) || 0
+              )
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
             placeholder="0.00"
           />
@@ -113,7 +131,7 @@ export function FormularioClasseVIII({ value, onChange }: FormularioClasseVIIIPr
           <input
             type="checkbox"
             checked={params.incluiServicos}
-            onChange={(e) => handleChange('incluiServicos', e.target.checked)}
+            onChange={(e) => handleChange("incluiServicos", e.target.checked)}
             className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-2 focus:ring-green-600"
           />
           <span className="text-sm font-medium text-gray-700">
@@ -133,8 +151,10 @@ export function FormularioClasseVIII({ value, onChange }: FormularioClasseVIIIPr
               type="number"
               min="0"
               step="0.01"
-              value={params.custoServicos || ''}
-              onChange={(e) => handleChange('custoServicos', parseFloat(e.target.value) || 0)}
+              value={params.custoServicos || ""}
+              onChange={(e) =>
+                handleChange("custoServicos", parseFloat(e.target.value) || 0)
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
               placeholder="0.00"
             />
@@ -147,17 +167,15 @@ export function FormularioClasseVIII({ value, onChange }: FormularioClasseVIIIPr
 
       <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
         <p className="text-sm text-blue-800">
-          <strong>Fórmula:</strong> (Quantidade × Valor Unitário) + Custo Serviços (opcional)
+          <strong>Fórmula:</strong> (Quantidade × Valor Unitário) + Custo
+          Serviços (opcional)
         </p>
         <p className="text-xs text-blue-700 mt-1">
           Exemplos: medicamentos, equipamentos médicos, serviços médicos, exames
         </p>
       </div>
 
-      <PreviewCalculo
-        valorTotal={valorTotal}
-        detalhes={detalhes}
-      />
+      <PreviewCalculo valorTotal={valorTotal} carimbo={detalhes} />
     </div>
   );
 }

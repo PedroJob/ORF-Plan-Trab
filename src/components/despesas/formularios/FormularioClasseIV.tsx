@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { PreviewCalculo } from '../PreviewCalculo';
-import { Plus, X } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { PreviewCalculo } from "../PreviewCalculo";
+import { Plus, X } from "lucide-react";
+import { HandleParametrosChange } from "../ModalCriarDespesa";
 
 interface MaterialConstrucao {
   descricao: string;
@@ -16,10 +17,13 @@ interface ParametrosClasseIV {
 
 interface FormularioClasseIVProps {
   value: ParametrosClasseIV | null;
-  onChange: (params: ParametrosClasseIV, valorTotal: number, valorCombustivel?: number) => void;
+  onChange: (params: HandleParametrosChange) => void;
 }
 
-export function FormularioClasseIV({ value, onChange }: FormularioClasseIVProps) {
+export function FormularioClasseIV({
+  value,
+  onChange,
+}: FormularioClasseIVProps) {
   const [params, setParams] = useState<ParametrosClasseIV>(
     value || {
       materiais: [],
@@ -43,7 +47,7 @@ export function FormularioClasseIV({ value, onChange }: FormularioClasseIVProps)
     }
 
     const materiaisValidos = materiais.filter(
-      m => m.descricao && m.quantidade > 0 && m.valorUnitario > 0
+      (m) => m.descricao && m.quantidade > 0 && m.valorUnitario > 0
     );
 
     if (materiaisValidos.length === 0) {
@@ -52,7 +56,7 @@ export function FormularioClasseIV({ value, onChange }: FormularioClasseIVProps)
       return;
     }
 
-    const itensDetalhados = materiaisValidos.map(m => ({
+    const itensDetalhados = materiaisValidos.map((m) => ({
       descricao: m.descricao,
       quantidade: m.quantidade,
       valorUnitario: m.valorUnitario,
@@ -67,25 +71,32 @@ export function FormularioClasseIV({ value, onChange }: FormularioClasseIVProps)
       numeroItens: itensDetalhados.length,
       itens: itensDetalhados,
     });
-    onChange(params, totalFinal);
+    onChange({ params, valor: totalFinal, descricao: detalhes });
   };
 
   const handleAddMaterial = () => {
-    setParams(prev => ({
+    setParams((prev) => ({
       ...prev,
-      materiais: [...prev.materiais, { descricao: '', quantidade: 0, valorUnitario: 0 }],
+      materiais: [
+        ...prev.materiais,
+        { descricao: "", quantidade: 0, valorUnitario: 0 },
+      ],
     }));
   };
 
   const handleRemoveMaterial = (index: number) => {
-    setParams(prev => ({
+    setParams((prev) => ({
       ...prev,
       materiais: prev.materiais.filter((_, i) => i !== index),
     }));
   };
 
-  const handleMaterialChange = (index: number, field: keyof MaterialConstrucao, value: any) => {
-    setParams(prev => ({
+  const handleMaterialChange = (
+    index: number,
+    field: keyof MaterialConstrucao,
+    value: any
+  ) => {
+    setParams((prev) => ({
       ...prev,
       materiais: prev.materiais.map((m, i) =>
         i === index ? { ...m, [field]: value } : m
@@ -102,9 +113,14 @@ export function FormularioClasseIV({ value, onChange }: FormularioClasseIVProps)
 
         <div className="space-y-3">
           {params.materiais.map((material, index) => (
-            <div key={index} className="border border-gray-300 rounded-md p-3 space-y-3">
+            <div
+              key={index}
+              className="border border-gray-300 rounded-md p-3 space-y-3"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">Material {index + 1}</span>
+                <span className="text-sm font-medium text-gray-700">
+                  Material {index + 1}
+                </span>
                 <button
                   type="button"
                   onClick={() => handleRemoveMaterial(index)}
@@ -122,7 +138,9 @@ export function FormularioClasseIV({ value, onChange }: FormularioClasseIVProps)
                 <input
                   type="text"
                   value={material.descricao}
-                  onChange={(e) => handleMaterialChange(index, 'descricao', e.target.value)}
+                  onChange={(e) =>
+                    handleMaterialChange(index, "descricao", e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent text-sm"
                   placeholder="Ex: Cimento Portland 50kg"
                 />
@@ -137,8 +155,14 @@ export function FormularioClasseIV({ value, onChange }: FormularioClasseIVProps)
                     type="number"
                     min="0"
                     step="0.01"
-                    value={material.quantidade || ''}
-                    onChange={(e) => handleMaterialChange(index, 'quantidade', parseFloat(e.target.value) || 0)}
+                    value={material.quantidade || ""}
+                    onChange={(e) =>
+                      handleMaterialChange(
+                        index,
+                        "quantidade",
+                        parseFloat(e.target.value) || 0
+                      )
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent text-sm"
                     placeholder="0.00"
                   />
@@ -152,8 +176,14 @@ export function FormularioClasseIV({ value, onChange }: FormularioClasseIVProps)
                     type="number"
                     min="0"
                     step="0.01"
-                    value={material.valorUnitario || ''}
-                    onChange={(e) => handleMaterialChange(index, 'valorUnitario', parseFloat(e.target.value) || 0)}
+                    value={material.valorUnitario || ""}
+                    onChange={(e) =>
+                      handleMaterialChange(
+                        index,
+                        "valorUnitario",
+                        parseFloat(e.target.value) || 0
+                      )
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent text-sm"
                     placeholder="0.00"
                   />
@@ -163,8 +193,12 @@ export function FormularioClasseIV({ value, onChange }: FormularioClasseIVProps)
               {material.quantidade > 0 && material.valorUnitario > 0 && (
                 <div className="bg-gray-50 rounded px-3 py-2">
                   <p className="text-xs text-gray-600">
-                    Subtotal: <span className="font-semibold text-gray-900">
-                      R$ {(material.quantidade * material.valorUnitario).toLocaleString('pt-BR', {
+                    Subtotal:{" "}
+                    <span className="font-semibold text-gray-900">
+                      R${" "}
+                      {(
+                        material.quantidade * material.valorUnitario
+                      ).toLocaleString("pt-BR", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
@@ -188,14 +222,12 @@ export function FormularioClasseIV({ value, onChange }: FormularioClasseIVProps)
 
       <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
         <p className="text-sm text-blue-800">
-          <strong>Fórmula:</strong> Soma de (Quantidade × Valor Unitário) de todos os materiais
+          <strong>Fórmula:</strong> Soma de (Quantidade × Valor Unitário) de
+          todos os materiais
         </p>
       </div>
 
-      <PreviewCalculo
-        valorTotal={valorTotal}
-        detalhes={detalhes}
-      />
+      <PreviewCalculo valorTotal={valorTotal} carimbo={detalhes} />
     </div>
   );
 }

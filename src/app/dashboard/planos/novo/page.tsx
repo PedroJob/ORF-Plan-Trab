@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ArrowLeft } from 'lucide-react';
@@ -19,14 +19,15 @@ interface Operacao {
 
 export default function NovoPlanoPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [operacoes, setOperacoes] = useState<Operacao[]>([]);
   const [loadingOperacoes, setLoadingOperacoes] = useState(true);
 
   const [formData, setFormData] = useState({
-    titulo: '',
-    operacaoId: '',
+    titulo: 'P Trab LOG CMA',
+    operacaoId: searchParams.get('operacaoId') || '',
     prioridade: 'MEDIA',
     tipo: 'LOGISTICO',
   });
@@ -89,6 +90,41 @@ export default function NovoPlanoPage() {
       <div className="bg-white rounded-lg border border-olive-200 p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+              <label className="block text-sm font-medium text-olive-800 mb-1">
+                Tipo de Plano <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={formData.tipo}
+                onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                className="w-full px-3 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 bg-white"
+                required
+              >
+                <option value="LOGISTICO">Logístico</option>
+                <option value="OPERACIONAL_GND3" disabled>Operacional GND3 (Em desenvolvimento)</option>
+                <option value="OPERACIONAL_GND4" disabled>Operacional GND4 (Em desenvolvimento)</option>
+                <option value="RACAO_R2" disabled>Ração R2 (Em desenvolvimento)</option>
+                <option value="MUNICAO" disabled>Munição (Em desenvolvimento)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-olive-800 mb-1">
+                Prioridade <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={formData.prioridade}
+                onChange={(e) => setFormData({ ...formData, prioridade: e.target.value })}
+                className="w-full px-3 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 bg-white"
+                required
+              >
+                <option value="BAIXA">Baixa</option>
+                <option value="MEDIA">Média</option>
+                <option value="ALTA">Alta</option>
+                <option value="CRITICA">Crítica</option>
+              </select>
+            </div>
+
             <div className="md:col-span-2">
               <Input
                 label="Título do Plano"
@@ -134,44 +170,6 @@ export default function NovoPlanoPage() {
                 </select>
               )}
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-olive-800 mb-1">
-                Tipo de Plano <span className="text-red-600">*</span>
-              </label>
-              <select
-                value={formData.tipo}
-                onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
-                className="w-full px-3 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 bg-white"
-                required
-              >
-                <option value="LOGISTICO">Logístico</option>
-                <option value="OPERACIONAL_GND3" disabled>Operacional GND3 (Em desenvolvimento)</option>
-                <option value="OPERACIONAL_GND4" disabled>Operacional GND4 (Em desenvolvimento)</option>
-                <option value="RACAO_R2" disabled>Ração R2 (Em desenvolvimento)</option>
-                <option value="MUNICAO" disabled>Munição (Em desenvolvimento)</option>
-              </select>
-              <p className="text-xs text-olive-600 mt-1">
-                Atualmente apenas planos Logísticos estão disponíveis
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-olive-800 mb-1">
-                Prioridade <span className="text-red-600">*</span>
-              </label>
-              <select
-                value={formData.prioridade}
-                onChange={(e) => setFormData({ ...formData, prioridade: e.target.value })}
-                className="w-full px-3 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 bg-white"
-                required
-              >
-                <option value="BAIXA">Baixa</option>
-                <option value="MEDIA">Média</option>
-                <option value="ALTA">Alta</option>
-                <option value="CRITICA">Crítica</option>
-              </select>
-            </div>
           </div>
 
           {error && (
@@ -179,18 +177,6 @@ export default function NovoPlanoPage() {
               <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
-
-          <div className="bg-military-50 border border-military-200 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-military-900 mb-2">
-              📋 Próximos Passos
-            </h3>
-            <ul className="text-sm text-olive-700 space-y-1">
-              <li>1. Criar o plano de trabalho</li>
-              <li>2. Adicionar despesass</li>
-              <li>3. Anexar documentos de referência</li>
-              <li>4. Enviar para análise e aprovação</li>
-            </ul>
-          </div>
 
           <div className="flex gap-4">
             <Button type="submit" isLoading={isLoading} disabled={operacoes.length === 0}>

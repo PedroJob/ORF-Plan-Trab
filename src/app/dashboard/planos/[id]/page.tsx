@@ -1,56 +1,17 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { ArrowLeft, Plus, Trash2, Check, X } from 'lucide-react';
-import Link from 'next/link';
-import { DespesasLogistico } from '@/components/despesas/DespesasLogistico';
-
-interface ItemFinanceiro {
-  id: string;
-  descricao: string;
-  valorUnitario: number;
-  quantidade: number;
-  valorTotal: number;
-  om: {
-    id: string;
-    nome: string;
-    sigla: string;
-    codUG: string;
-  };
-  natureza: {
-    id: string;
-    codigo: string;
-    nome: string;
-  };
-}
-
-interface PlanoTrabalho {
-  id: string;
-  titulo: string;
-  versao: number;
-  status: string;
-  prioridade: string;
-  tipo: string;
-  operacao: {
-    id: string;
-    nome: string;
-    efetivo: number;
-    dataInicio: string;
-    dataFinal: string;
-    om: {
-      id: string;
-      nome: string;
-      sigla: string;
-    };
-  };
-  responsavel: {
-    nomeCompleto: string;
-    postoGraduacao: string;
-  };
-}
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { ArrowLeft, Plus, Trash2, Check, X } from "lucide-react";
+import Link from "next/link";
+import { DespesasLogistico } from "@/components/despesas/DespesasLogistico";
+import { StatusAprovacao } from "@/components/planos/StatusAprovacao";
+import { HistoricoAprovacoes } from "@/components/planos/HistoricoAprovacoes";
+import { DespesaWithRelations } from "@/types/despesas";
+import { PlanoTrabalho, Prisma } from "@prisma/client";
+import { PlanoTrabalhoWithRelations } from "@/types/plano-trabalho";
 
 interface OM {
   id: string;
@@ -72,20 +33,21 @@ export default function PlanoTrabalhoPage() {
   const router = useRouter();
   const id = params?.id as string;
 
-  const [plano, setPlano] = useState<PlanoTrabalho | null>(null);
-  const [itens, setItens] = useState<ItemFinanceiro[]>([]);
+  const [plano, setPlano] = useState<PlanoTrabalhoWithRelations | null>(null);
+  const [despesas, setDespesas] = useState<DespesaWithRelations[]>([]);
   const [oms, setOms] = useState<OM[]>([]);
   const [naturezas, setNaturezas] = useState<Natureza[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddItem, setShowAddItem] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   // Form state for new item
   const [newItem, setNewItem] = useState({
-    descricao: '',
-    valorUnitario: '',
-    quantidade: '',
-    omId: '',
-    naturezaId: '',
+    descricao: "",
+    valorUnitario: "",
+    quantidade: "",
+    omId: "",
+    naturezaId: "",
   });
 
   useEffect(() => {
@@ -93,6 +55,7 @@ export default function PlanoTrabalhoPage() {
       fetchData();
       fetchOms();
       fetchNaturezas();
+      fetchCurrentUser();
     }
   }, [id]);
 
@@ -110,10 +73,10 @@ export default function PlanoTrabalhoPage() {
 
       if (itensRes.ok) {
         const itensData = await itensRes.json();
-        setItens(itensData);
+        setDespesas(itensData);
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error("Error fetching data:", error);
     } finally {
       setIsLoading(false);
     }
@@ -121,37 +84,72 @@ export default function PlanoTrabalhoPage() {
 
   const fetchOms = async () => {
     try {
-      const response = await fetch('/api/organizacoes');
+      const response = await fetch("/api/organizacoes");
       if (response.ok) {
         const data = await response.json();
         setOms(data);
       }
     } catch (error) {
-      console.error('Error fetching OMs:', error);
+      console.error("Error fetching OMs:", error);
     }
   };
 
   const fetchNaturezas = async () => {
     try {
-      const response = await fetch('/api/naturezas');
+      const response = await fetch("/api/naturezas");
       if (response.ok) {
         const data = await response.json();
         setNaturezas(data);
       }
     } catch (error) {
-      console.error('Error fetching naturezas:', error);
+      console.error("Error fetching naturezas:", error);
     }
+  };
+
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentUserRole(data.role);
+      }
+    } catch (error) {
+      console.error("Error fetching current user:", error);
+    }
+  };
+
+  // Verifica se o usuário atual pode aprovar no nível atual do plano
+  const canApproveCurrentLevel = (): boolean => {
+    if (!plano || !currentUserRole || !plano.nivelAprovacaoAtual) {
+      return false;
+    }
+
+    // Mapeia nível para role necessária
+    const nivelToRole: Record<number, string> = {
+      1: "CMT_OM",
+      2: "CMT_BRIGADA",
+      3: "CMT_CMA",
+    };
+
+    const requiredRole = nivelToRole[plano.nivelAprovacaoAtual];
+
+    // SUPER_ADMIN pode aprovar em qualquer nível
+    if (currentUserRole === "SUPER_ADMIN") return true;
+
+    // Usuário deve ter a role exata do nível
+    return currentUserRole === requiredRole;
   };
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const valorTotal = parseFloat(newItem.valorUnitario) * parseFloat(newItem.quantidade);
+    const valorTotal =
+      parseFloat(newItem.valorUnitario) * parseFloat(newItem.quantidade);
 
     try {
       const response = await fetch(`/api/planos/${id}/itens`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           descricao: newItem.descricao,
           valorUnitario: parseFloat(newItem.valorUnitario),
@@ -164,73 +162,101 @@ export default function PlanoTrabalhoPage() {
 
       if (response.ok) {
         const novoItem = await response.json();
-        setItens([...itens, novoItem]);
+        setDespesas([...despesas, novoItem]);
         setNewItem({
-          descricao: '',
-          valorUnitario: '',
-          quantidade: '',
-          omId: '',
-          naturezaId: '',
+          descricao: "",
+          valorUnitario: "",
+          quantidade: "",
+          omId: "",
+          naturezaId: "",
         });
         setShowAddItem(false);
       } else {
         const error = await response.json();
-        console.error('Error response:', error);
-        alert(`Erro ao adicionar item: ${error.error || 'Erro desconhecido'}`);
+        console.error("Error response:", error);
+        alert(`Erro ao adicionar item: ${error.error || "Erro desconhecido"}`);
       }
     } catch (error) {
-      console.error('Error adding item:', error);
-      alert('Erro ao adicionar item');
+      console.error("Error adding item:", error);
+      alert("Erro ao adicionar item");
+    }
+  };
+
+  const handleEnviarAnalise = async () => {
+    if (!confirm("Deseja enviar este plano para análise? Após o envio, o plano ficará bloqueado para edições até a conclusão do processo de aprovação.")) return;
+
+    try {
+      const response = await fetch(`/api/planos/${id}/enviar-analise`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(data.message || "Plano enviado para análise com sucesso!");
+        fetchData();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Erro ao enviar plano para análise");
+      }
+    } catch (error) {
+      console.error("Error sending for analysis:", error);
+      alert("Erro ao enviar plano para análise");
     }
   };
 
   const handleAprovar = async () => {
-    if (!confirm('Deseja aprovar este plano de trabalho?')) return;
+    if (!confirm("Deseja aprovar este plano de trabalho?")) return;
 
     try {
       const response = await fetch(`/api/planos/${id}/aprovar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ acao: 'APROVADO' }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "APROVADO" }),
       });
 
       if (response.ok) {
-        alert('Plano aprovado com sucesso!');
+        const data = await response.json();
+        alert(data.message || "Plano aprovado com sucesso!");
         fetchData();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Erro ao aprovar plano");
       }
     } catch (error) {
-      console.error('Error approving:', error);
+      console.error("Error approving:", error);
+      alert("Erro ao aprovar plano");
     }
   };
 
   const handleReprovar = async () => {
-    const motivo = prompt('Motivo da reprovação:');
+    const motivo = prompt("Motivo da reprovação:");
     if (!motivo) return;
 
     try {
       const response = await fetch(`/api/planos/${id}/aprovar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ acao: 'REPROVADO', motivo }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "REPROVADO", motivo }),
       });
 
       if (response.ok) {
-        alert('Plano reprovado!');
+        alert("Plano reprovado!");
         fetchData();
       }
     } catch (error) {
-      console.error('Error rejecting:', error);
+      console.error("Error rejecting:", error);
     }
   };
 
   const calcularTotal = () => {
-    return itens.reduce((sum, item) => sum + item.valorTotal, 0);
+    return despesas.reduce((sum, item) => sum + Number(item.valorCalculado), 0);
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(value);
   };
 
@@ -249,7 +275,10 @@ export default function PlanoTrabalhoPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link href="/dashboard/planos" className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4">
+        <Link
+          href="/dashboard/planos"
+          className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4"
+        >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar para Planos
         </Link>
@@ -261,7 +290,13 @@ export default function PlanoTrabalhoPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            {plano.status === 'EM_ANALISE' && (
+            {plano.status === "RASCUNHO" && (
+              <Button variant="primary" onClick={handleEnviarAnalise}>
+                <Check className="w-4 h-4 mr-2" />
+                Enviar para Análise
+              </Button>
+            )}
+            {plano.status === "EM_ANALISE" && canApproveCurrentLevel() && (
               <>
                 <Button variant="success" onClick={handleAprovar}>
                   <Check className="w-4 h-4 mr-2" />
@@ -277,11 +312,55 @@ export default function PlanoTrabalhoPage() {
         </div>
       </div>
 
+      {/* Alerta de Bloqueio */}
+      {plano.status === "EM_ANALISE" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <h3 className="text-sm font-medium text-amber-800">
+                Plano em análise - Edições bloqueadas
+              </h3>
+              <div className="mt-2 text-sm text-amber-700">
+                <p>
+                  Este plano está em processo de aprovação.{" "}
+                  {plano.nivelAprovacaoAtual && (
+                    <>
+                      <span className="font-semibold">
+                        Aguardando aprovação do nível {plano.nivelAprovacaoAtual}/3:{" "}
+                        {
+                          {
+                            1: "Comandante da OM",
+                            2: "Comandante da Brigada",
+                            3: "Comandante do CMA",
+                          }[plano.nivelAprovacaoAtual]
+                        }
+                      </span>
+                      {canApproveCurrentLevel() && (
+                        <span className="block mt-1 text-green-700 font-semibold">
+                          ✓ Você pode aprovar/reprovar este plano
+                        </span>
+                      )}
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="text-sm text-gray-600">Status</div>
-          <div className="text-lg font-semibold text-gray-900">{plano.status.replace('_', ' ')}</div>
+          <div className="text-lg font-semibold text-gray-900">
+            {plano.status.replace("_", " ")}
+          </div>
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="text-sm text-gray-600">Responsável</div>
@@ -291,18 +370,21 @@ export default function PlanoTrabalhoPage() {
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="text-sm text-gray-600">Valor Total</div>
-          <div className="text-lg font-semibold text-blue-600">{formatCurrency(calcularTotal())}</div>
+          <div className="text-lg font-semibold text-blue-600">
+            {formatCurrency(Number(plano.valorTotalDespesas))}
+          </div>
         </div>
       </div>
 
       {/* Despesas - Condicional por Tipo */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        {plano.tipo === 'LOGISTICO' ? (
+        {plano.tipo === "LOGISTICO" ? (
           <DespesasLogistico
             planoId={id}
             oms={oms}
-            operacao={plano.operacao}
-            canEdit={plano.status === 'RASCUNHO'}
+            operacao={plano.operacao as any}
+            canEdit={plano.status === "RASCUNHO"}
+            onRefresh={fetchData}
           />
         ) : (
           <>
@@ -314,158 +396,213 @@ export default function PlanoTrabalhoPage() {
               </Button>
             </div>
 
-        {showAddItem && (
-          <form onSubmit={handleAddItem} className="mb-6 p-4 bg-military-50 rounded-lg space-y-4 border border-military-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-military-900 mb-1">
-                  Descrição *
-                </label>
-                <Input
-                  value={newItem.descricao}
-                  onChange={(e) => setNewItem({ ...newItem, descricao: e.target.value })}
-                  required
-                  placeholder="Ex: Aquisição de gêneros alimentícios..."
-                />
-              </div>
+            {showAddItem && (
+              <form
+                onSubmit={handleAddItem}
+                className="mb-6 p-4 bg-military-50 rounded-lg space-y-4 border border-military-200"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-military-900 mb-1">
+                      Descrição *
+                    </label>
+                    <Input
+                      value={newItem.descricao}
+                      onChange={(e) =>
+                        setNewItem({ ...newItem, descricao: e.target.value })
+                      }
+                      required
+                      placeholder="Ex: Aquisição de gêneros alimentícios..."
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-military-900 mb-1">
-                  Organização Militar *
-                </label>
-                <select
-                  value={newItem.omId}
-                  onChange={(e) => setNewItem({ ...newItem, omId: e.target.value })}
-                  className="w-full px-4 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 focus:border-transparent bg-white"
-                  required
-                >
-                  <option value="">Selecione uma OM</option>
-                  {oms.map((om) => (
-                    <option key={om.id} value={om.id}>
-                      {om.sigla} - {om.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-military-900 mb-1">
+                      Organização Militar *
+                    </label>
+                    <select
+                      value={newItem.omId}
+                      onChange={(e) =>
+                        setNewItem({ ...newItem, omId: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 focus:border-transparent bg-white"
+                      required
+                    >
+                      <option value="">Selecione uma OM</option>
+                      {oms.map((om) => (
+                        <option key={om.id} value={om.id}>
+                          {om.sigla} - {om.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-military-900 mb-1">
-                  Natureza de Despesa *
-                </label>
-                <select
-                  value={newItem.naturezaId}
-                  onChange={(e) => setNewItem({ ...newItem, naturezaId: e.target.value })}
-                  className="w-full px-4 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 focus:border-transparent bg-white"
-                  required
-                >
-                  <option value="">Selecione uma natureza</option>
-                  {naturezas.map((natureza) => (
-                    <option key={natureza.id} value={natureza.id}>
-                      {natureza.codigo} - {natureza.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-military-900 mb-1">
+                      Natureza de Despesa *
+                    </label>
+                    <select
+                      value={newItem.naturezaId}
+                      onChange={(e) =>
+                        setNewItem({ ...newItem, naturezaId: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 focus:border-transparent bg-white"
+                      required
+                    >
+                      <option value="">Selecione uma natureza</option>
+                      {naturezas.map((natureza) => (
+                        <option key={natureza.id} value={natureza.id}>
+                          {natureza.codigo} - {natureza.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-military-900 mb-1">
-                  Valor Unitário (R$) *
-                </label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={newItem.valorUnitario}
-                  onChange={(e) => setNewItem({ ...newItem, valorUnitario: e.target.value })}
-                  required
-                  placeholder="0.00"
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-military-900 mb-1">
+                      Valor Unitário (R$) *
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={newItem.valorUnitario}
+                      onChange={(e) =>
+                        setNewItem({
+                          ...newItem,
+                          valorUnitario: e.target.value,
+                        })
+                      }
+                      required
+                      placeholder="0.00"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-military-900 mb-1">
-                  Quantidade *
-                </label>
-                <Input
-                  type="number"
-                  step="0.001"
-                  min="0.001"
-                  value={newItem.quantidade}
-                  onChange={(e) => setNewItem({ ...newItem, quantidade: e.target.value })}
-                  required
-                  placeholder="1"
-                />
-              </div>
-            </div>
+                  <div>
+                    <label className="block text-sm font-medium text-military-900 mb-1">
+                      Quantidade *
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      min="0.001"
+                      value={newItem.quantidade}
+                      onChange={(e) =>
+                        setNewItem({ ...newItem, quantidade: e.target.value })
+                      }
+                      required
+                      placeholder="1"
+                    />
+                  </div>
+                </div>
 
-            {newItem.valorUnitario && newItem.quantidade && (
-              <div className="bg-white p-3 rounded border border-military-200">
-                <span className="text-sm text-olive-700">Valor Total: </span>
-                <span className="text-lg font-bold text-military-700">
-                  {formatCurrency(parseFloat(newItem.valorUnitario) * parseFloat(newItem.quantidade))}
-                </span>
-              </div>
+                {newItem.valorUnitario && newItem.quantidade && (
+                  <div className="bg-white p-3 rounded border border-military-200">
+                    <span className="text-sm text-olive-700">
+                      Valor Total:{" "}
+                    </span>
+                    <span className="text-lg font-bold text-military-700">
+                      {formatCurrency(
+                        parseFloat(newItem.valorUnitario) *
+                          parseFloat(newItem.quantidade)
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button type="submit" size="sm">
+                    Adicionar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setShowAddItem(false)}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </form>
             )}
 
-            <div className="flex gap-2">
-              <Button type="submit" size="sm">Adicionar</Button>
-              <Button type="button" size="sm" variant="secondary" onClick={() => setShowAddItem(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </form>
-        )}
-
-        {/* Tabela de Itens */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left p-3 text-sm font-medium text-gray-700">OM</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-700">Natureza</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-700">Descrição</th>
-                <th className="text-right p-3 text-sm font-medium text-gray-700">Valor Unit.</th>
-                <th className="text-right p-3 text-sm font-medium text-gray-700">Qtd</th>
-                <th className="text-right p-3 text-sm font-medium text-gray-700">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itens.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center p-8 text-gray-500">
-                    Nenhum item cadastrado
-                  </td>
-                </tr>
-              ) : (
-                itens.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="p-3 text-sm text-gray-900">{item.om.sigla}</td>
-                    <td className="p-3 text-sm text-gray-900">{item.natureza.nome}</td>
-                    <td className="p-3 text-sm text-gray-600">{item.descricao}</td>
-                    <td className="p-3 text-sm text-gray-900 text-right">{formatCurrency(item.valorUnitario)}</td>
-                    <td className="p-3 text-sm text-gray-900 text-right">{item.quantidade}</td>
-                    <td className="p-3 text-sm font-medium text-gray-900 text-right">
-                      {formatCurrency(item.valorTotal)}
+            {/* Tabela de Itens */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left p-3 text-sm font-medium text-gray-700">
+                      OM
+                    </th>
+                    <th className="text-left p-3 text-sm font-medium text-gray-700">
+                      Natureza
+                    </th>
+                    <th className="text-left p-3 text-sm font-medium text-gray-700">
+                      Descrição
+                    </th>
+                    <th className="text-right p-3 text-sm font-medium text-gray-700">
+                      Valor Unit.
+                    </th>
+                    <th className="text-right p-3 text-sm font-medium text-gray-700">
+                      Qtd
+                    </th>
+                    <th className="text-right p-3 text-sm font-medium text-gray-700">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {despesas.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center p-8 text-gray-500">
+                        Nenhum item cadastrado
+                      </td>
+                    </tr>
+                  ) : (
+                    despesas.map((item) => (
+                      <tr
+                        key={item.id}
+                        className="border-b border-gray-100 hover:bg-gray-50"
+                      >
+                        <td className="p-3 text-sm text-gray-600">
+                          {item.descricao}
+                        </td>
+                        <td className="p-3 text-sm text-gray-900 text-right">
+                          {formatCurrency(Number(item.valorCalculado))}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-gray-300">
+                    <td
+                      colSpan={5}
+                      className="p-3 text-right font-semibold text-gray-900"
+                    >
+                      Total:
+                    </td>
+                    <td className="p-3 text-right font-bold text-blue-600 text-lg">
+                      {formatCurrency(calcularTotal())}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-gray-300">
-                <td colSpan={5} className="p-3 text-right font-semibold text-gray-900">
-                  Total:
-                </td>
-                <td className="p-3 text-right font-bold text-blue-600 text-lg">
-                  {formatCurrency(calcularTotal())}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                </tfoot>
+              </table>
+            </div>
           </>
         )}
       </div>
+
+      {/* Status de Aprovação e Histórico */}
+      {plano.status !== "RASCUNHO" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <StatusAprovacao
+            nivelAtual={plano.nivelAprovacaoAtual}
+            status={plano.status}
+          />
+          <HistoricoAprovacoes planoId={id} />
+        </div>
+      )}
     </div>
   );
 }

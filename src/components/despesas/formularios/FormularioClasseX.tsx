@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { PreviewCalculo } from '../PreviewCalculo';
+import { useState, useEffect } from "react";
+import { PreviewCalculo } from "../PreviewCalculo";
+import { HandleParametrosChange } from "../ModalCriarDespesa";
 
 interface ParametrosClasseX {
   quantidade: number;
@@ -11,7 +12,7 @@ interface ParametrosClasseX {
 
 interface FormularioClasseXProps {
   value: ParametrosClasseX | null;
-  onChange: (params: ParametrosClasseX, valorTotal: number, valorCombustivel?: number) => void;
+  onChange: (params: HandleParametrosChange) => void;
 }
 
 export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
@@ -19,7 +20,7 @@ export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
     value || {
       quantidade: 0,
       valorUnitario: 0,
-      descricaoDetalhada: '',
+      descricaoDetalhada: "",
     }
   );
 
@@ -46,13 +47,13 @@ export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
     setDetalhes({
       quantidade,
       valorUnitario,
-      descricaoDetalhada: descricaoDetalhada || 'Não especificado',
+      descricaoDetalhada: descricaoDetalhada || "Não especificado",
     });
-    onChange(params, totalFinal);
+    onChange({ params, valor: totalFinal, descricao: detalhes });
   };
 
   const handleChange = (field: keyof ParametrosClasseX, value: any) => {
-    setParams(prev => ({ ...prev, [field]: value }));
+    setParams((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -62,24 +63,26 @@ export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
           <strong>Classe X - Material Não Classificado</strong>
         </p>
         <p className="text-xs text-blue-700 mt-1">
-          Esta classe é para materiais que não se enquadram nas outras classes (I a IX).
-          Forneça uma descrição detalhada do material.
+          Esta classe é para materiais que não se enquadram nas outras classes
+          (I a IX). Forneça uma descrição detalhada do material.
         </p>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Descrição Detalhada do Material <span className="text-red-500">*</span>
+          Descrição Detalhada do Material{" "}
+          <span className="text-red-500">*</span>
         </label>
         <textarea
           value={params.descricaoDetalhada}
-          onChange={(e) => handleChange('descricaoDetalhada', e.target.value)}
+          onChange={(e) => handleChange("descricaoDetalhada", e.target.value)}
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent resize-none"
           placeholder="Descreva detalhadamente o material não classificado nas demais classes..."
         />
         <p className="text-xs text-gray-500 mt-1">
-          Explique qual material está sendo solicitado e por que não se enquadra em outras classes
+          Explique qual material está sendo solicitado e por que não se enquadra
+          em outras classes
         </p>
       </div>
 
@@ -92,8 +95,10 @@ export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
             type="number"
             min="1"
             step="0.01"
-            value={params.quantidade || ''}
-            onChange={(e) => handleChange('quantidade', parseFloat(e.target.value) || 0)}
+            value={params.quantidade || ""}
+            onChange={(e) =>
+              handleChange("quantidade", parseFloat(e.target.value) || 0)
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
             placeholder="Quantidade de unidades"
           />
@@ -110,8 +115,10 @@ export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
             type="number"
             min="0"
             step="0.01"
-            value={params.valorUnitario || ''}
-            onChange={(e) => handleChange('valorUnitario', parseFloat(e.target.value) || 0)}
+            value={params.valorUnitario || ""}
+            onChange={(e) =>
+              handleChange("valorUnitario", parseFloat(e.target.value) || 0)
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
             placeholder="0.00"
           />
@@ -127,10 +134,7 @@ export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
         </p>
       </div>
 
-      <PreviewCalculo
-        valorTotal={valorTotal}
-        detalhes={detalhes}
-      />
+      <PreviewCalculo valorTotal={valorTotal} carimbo={detalhes} />
     </div>
   );
 }

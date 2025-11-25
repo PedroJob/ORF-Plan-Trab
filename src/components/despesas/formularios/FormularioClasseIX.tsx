@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { PreviewCalculo } from '../PreviewCalculo';
+import { useState, useEffect } from "react";
+import { PreviewCalculo } from "../PreviewCalculo";
+import { HandleParametrosChange } from "../ModalCriarDespesa";
 
 interface ParametrosClasseIX {
-  grupoViatura: 'GP1' | 'GP2' | 'GP3';
+  grupoViatura: "GP1" | "GP2" | "GP3";
   numeroViaturas: number;
   valorPecas: number;
   custoMaoObra: number;
@@ -12,19 +13,22 @@ interface ParametrosClasseIX {
 
 interface FormularioClasseIXProps {
   value: ParametrosClasseIX | null;
-  onChange: (params: ParametrosClasseIX, valorTotal: number, valorCombustivel?: number) => void;
+  onChange: (params: HandleParametrosChange) => void;
 }
 
 const GRUPOS_INFO = {
-  GP1: 'Viaturas leves (até 3,5t)',
-  GP2: 'Viaturas médias (3,5t a 10t)',
-  GP3: 'Viaturas pesadas (acima de 10t)',
+  GP1: "Viaturas leves (até 3,5t)",
+  GP2: "Viaturas médias (3,5t a 10t)",
+  GP3: "Viaturas pesadas (acima de 10t)",
 };
 
-export function FormularioClasseIX({ value, onChange }: FormularioClasseIXProps) {
+export function FormularioClasseIX({
+  value,
+  onChange,
+}: FormularioClasseIXProps) {
   const [params, setParams] = useState<ParametrosClasseIX>(
     value || {
-      grupoViatura: 'GP1',
+      grupoViatura: "GP1",
       numeroViaturas: 0,
       valorPecas: 0,
       custoMaoObra: 0,
@@ -64,11 +68,11 @@ export function FormularioClasseIX({ value, onChange }: FormularioClasseIXProps)
       custoMaoObra,
       custoPorViatura: Number((valorPecas + custoMaoObra).toFixed(2)),
     });
-    onChange(params, totalFinal);
+    onChange({ params, valor: totalFinal, descricao: detalhes });
   };
 
   const handleChange = (field: keyof ParametrosClasseIX, value: any) => {
-    setParams(prev => ({ ...prev, [field]: value }));
+    setParams((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -83,8 +87,8 @@ export function FormularioClasseIX({ value, onChange }: FormularioClasseIXProps)
               key={grupo}
               className={`flex items-center gap-3 p-3 border rounded-md cursor-pointer transition-all ${
                 params.grupoViatura === grupo
-                  ? 'border-green-600 bg-green-50'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? "border-green-600 bg-green-50"
+                  : "border-gray-300 hover:border-gray-400"
               }`}
             >
               <input
@@ -92,7 +96,12 @@ export function FormularioClasseIX({ value, onChange }: FormularioClasseIXProps)
                 name="grupoViatura"
                 value={grupo}
                 checked={params.grupoViatura === grupo}
-                onChange={(e) => handleChange('grupoViatura', e.target.value as 'GP1' | 'GP2' | 'GP3')}
+                onChange={(e) =>
+                  handleChange(
+                    "grupoViatura",
+                    e.target.value as "GP1" | "GP2" | "GP3"
+                  )
+                }
                 className="w-4 h-4 text-green-600 border-gray-300 focus:ring-2 focus:ring-green-600"
               />
               <div className="flex-1">
@@ -113,8 +122,10 @@ export function FormularioClasseIX({ value, onChange }: FormularioClasseIXProps)
             type="number"
             min="1"
             step="1"
-            value={params.numeroViaturas || ''}
-            onChange={(e) => handleChange('numeroViaturas', parseInt(e.target.value) || 0)}
+            value={params.numeroViaturas || ""}
+            onChange={(e) =>
+              handleChange("numeroViaturas", parseInt(e.target.value) || 0)
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
             placeholder="Quantidade de viaturas"
           />
@@ -125,14 +136,17 @@ export function FormularioClasseIX({ value, onChange }: FormularioClasseIXProps)
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Valor das Peças por Viatura (R$) <span className="text-red-500">*</span>
+            Valor das Peças por Viatura (R$){" "}
+            <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
             min="0"
             step="0.01"
-            value={params.valorPecas || ''}
-            onChange={(e) => handleChange('valorPecas', parseFloat(e.target.value) || 0)}
+            value={params.valorPecas || ""}
+            onChange={(e) =>
+              handleChange("valorPecas", parseFloat(e.target.value) || 0)
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
             placeholder="0.00"
           />
@@ -143,14 +157,17 @@ export function FormularioClasseIX({ value, onChange }: FormularioClasseIXProps)
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Custo de Mão de Obra por Viatura (R$) <span className="text-red-500">*</span>
+            Custo de Mão de Obra por Viatura (R$){" "}
+            <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
             min="0"
             step="0.01"
-            value={params.custoMaoObra || ''}
-            onChange={(e) => handleChange('custoMaoObra', parseFloat(e.target.value) || 0)}
+            value={params.custoMaoObra || ""}
+            onChange={(e) =>
+              handleChange("custoMaoObra", parseFloat(e.target.value) || 0)
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
             placeholder="0.00"
           />
@@ -162,17 +179,15 @@ export function FormularioClasseIX({ value, onChange }: FormularioClasseIXProps)
 
       <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
         <p className="text-sm text-blue-800">
-          <strong>Fórmula:</strong> Número de Viaturas × (Valor Peças + Custo Mão de Obra)
+          <strong>Fórmula:</strong> Número de Viaturas × (Valor Peças + Custo
+          Mão de Obra)
         </p>
         <p className="text-xs text-blue-700 mt-1">
           Manutenção preventiva e corretiva de viaturas conforme o grupo
         </p>
       </div>
 
-      <PreviewCalculo
-        valorTotal={valorTotal}
-        detalhes={detalhes}
-      />
+      <PreviewCalculo valorTotal={valorTotal} carimbo={detalhes} />
     </div>
   );
 }

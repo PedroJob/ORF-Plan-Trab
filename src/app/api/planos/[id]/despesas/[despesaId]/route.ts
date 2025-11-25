@@ -10,9 +10,14 @@ const rateioOMSchema = z.object({
   percentual: z.number().min(0.01).max(100),
 });
 
+const rateioNaturezaSchema = z.object({
+  naturezaId: z.string().cuid('ID de natureza inválido'),
+  percentual: z.number().min(0.01).max(100),
+});
+
 const updateDespesaSchema = z.object({
   descricao: z.string().min(1, 'Descrição é obrigatória').optional(),
-  naturezas: z.array(z.string()).min(1, 'Selecione ao menos uma natureza').optional(),
+  naturezas: z.array(rateioNaturezaSchema).min(1, 'Selecione ao menos uma natureza').optional(),
   parametros: z.any().optional(),
   oms: z.array(rateioOMSchema).min(1, 'Selecione ao menos uma OM').optional(),
 });
@@ -51,6 +56,14 @@ export async function DELETE(
       );
     }
 
+    // Verificar bloqueio (plano em análise)
+    if (despesa.planoTrabalho.status === 'EM_ANALISE') {
+      return NextResponse.json(
+        { error: 'Plano em análise não pode ter despesas removidas. Aguardando aprovação.' },
+        { status: 403 }
+      );
+    }
+
     // Verificar permissão
     const user = await prisma.user.findUnique({
       where: { id: currentUser.userId },
@@ -70,6 +83,19 @@ export async function DELETE(
     // Excluir despesa (cascade irá deletar DespesaOM automaticamente)
     await prisma.despesa.delete({
       where: { id: despesaId },
+    });
+
+    // Recalculate total for the plano
+    const despesasTotal = await prisma.despesa.aggregate({
+      where: { planoTrabalhoId: id },
+      _sum: { valorCalculado: true },
+    });
+
+    await prisma.planoTrabalho.update({
+      where: { id },
+      data: {
+        valorTotalDespesas: despesasTotal._sum.valorCalculado || 0,
+      },
     });
 
     // Log de auditoria
@@ -162,8 +188,32 @@ export async function PATCH(
 
     // Validar naturezas se fornecidas
     if (naturezas) {
-      const naturezasInvalidas = naturezas.filter(
-        (nat) => !despesa.classe.naturezasPermitidas.includes(nat)
+      // Validar rateio de naturezas (soma deve ser 100%)
+      const somaPercentuaisNaturezas = naturezas.reduce((sum, nat) => sum + nat.percentual, 0);
+      if (Math.abs(somaPercentuaisNaturezas - 100) > 0.01) {
+        return NextResponse.json(
+          { error: `A soma dos percentuais de naturezas deve ser 100%. Soma atual: ${somaPercentuaisNaturezas}%` },
+          { status: 400 }
+        );
+      }
+
+      // Validar que todas as naturezas existem
+      const naturezaIds = naturezas.map((nat) => nat.naturezaId);
+      const naturezasExistentes = await prisma.naturezaDespesa.findMany({
+        where: { id: { in: naturezaIds } },
+      });
+
+      if (naturezasExistentes.length !== naturezaIds.length) {
+        return NextResponse.json(
+          { error: 'Uma ou mais naturezas não foram encontradas' },
+          { status: 404 }
+        );
+      }
+
+      // Validar naturezas (devem estar nas permitidas pela classe)
+      const codigosNaturezas = naturezasExistentes.map((nat) => nat.codigo);
+      const naturezasInvalidas = codigosNaturezas.filter(
+        (codigo) => !despesa.classe.naturezasPermitidas.includes(codigo)
       );
 
       if (naturezasInvalidas.length > 0) {
@@ -222,18 +272,26 @@ export async function PATCH(
       where: { id: despesaId },
       data: {
         ...(descricao && { descricao }),
-        ...(naturezas && { naturezas }),
         ...(parametros && {
           parametros: parametros as Prisma.JsonValue,
           valorCalculado,
           valorCombustivel,
         }),
         ...(oms && {
-          despesaOM: {
+          oms: {
             deleteMany: {},
             create: oms.map((om) => ({
               omId: om.omId,
               percentual: om.percentual,
+            })),
+          },
+        }),
+        ...(naturezas && {
+          despesasNaturezas: {
+            deleteMany: {},
+            create: naturezas.map((nat) => ({
+              naturezaId: nat.naturezaId,
+              percentual: nat.percentual,
             })),
           },
         }),
@@ -263,6 +321,31 @@ export async function PATCH(
             },
           },
         },
+        despesasNaturezas: {
+          include: {
+            natureza: {
+              select: {
+                id: true,
+                codigo: true,
+                nome: true,
+                descricao: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Recalculate total for the plano
+    const despesasTotal = await prisma.despesa.aggregate({
+      where: { planoTrabalhoId: id },
+      _sum: { valorCalculado: true },
+    });
+
+    await prisma.planoTrabalho.update({
+      where: { id },
+      data: {
+        valorTotalDespesas: despesasTotal._sum.valorCalculado || 0,
       },
     });
 

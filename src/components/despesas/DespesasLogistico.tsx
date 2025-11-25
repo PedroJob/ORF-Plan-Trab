@@ -1,15 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, AlertCircle } from 'lucide-react';
-import { ModalCriarDespesa } from './ModalCriarDespesa';
+import { useState, useEffect } from "react";
+import { Plus, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { ModalCriarDespesa } from "./ModalCriarDespesa";
+import type { OMSelect, OperacaoWithEfetivo } from "@/types/despesas";
 
+/**
+ * Serialized API response type for Despesa with relations
+ * Note: Prisma Decimal types are serialized to numbers, Dates to strings
+ */
 interface Despesa {
   id: string;
   descricao: string;
   valorCalculado: number;
   valorCombustivel: number | null;
-  naturezas: string[];
   classe: {
     nome: string;
     descricao: string;
@@ -29,32 +33,35 @@ interface Despesa {
       codUG: string;
     };
   }[];
+  despesasNaturezas: {
+    id: string;
+    naturezaId: string;
+    percentual: number;
+    natureza: {
+      id: string;
+      codigo: string;
+      nome: string;
+      descricao?: string;
+    };
+  }[];
   createdAt: string;
-}
-
-interface OM {
-  id: string;
-  nome: string;
-  sigla: string;
-  codUG: string;
-}
-
-interface Operacao {
-  id: string;
-  nome: string;
-  efetivo: number;
-  dataInicio: string;
-  dataFinal: string;
 }
 
 interface DespesasLogisticoProps {
   planoId: string;
-  oms: OM[];
-  operacao: Operacao;
+  oms: OMSelect[];
+  operacao: OperacaoWithEfetivo;
   canEdit: boolean;
+  onRefresh?: () => void | Promise<void>;
 }
 
-export function DespesasLogistico({ planoId, oms, operacao, canEdit }: DespesasLogisticoProps) {
+export function DespesasLogistico({
+  planoId,
+  oms,
+  operacao,
+  canEdit,
+  onRefresh,
+}: DespesasLogisticoProps) {
   const [loading, setLoading] = useState(true);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -73,46 +80,64 @@ export function DespesasLogistico({ planoId, oms, operacao, canEdit }: DespesasL
         setDespesas(data);
       }
     } catch (error) {
-      console.error('Erro ao carregar despesas:', error);
+      console.error("Erro ao carregar despesas:", error);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleDespesaSuccess = async () => {
+    await carregarDespesas();
+    // Refresh parent data to sync total values
+    if (onRefresh) {
+      await onRefresh();
+    }
+  };
+
   const handleDelete = async (despesaId: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta despesa?')) return;
+    if (!confirm("Tem certeza que deseja excluir esta despesa?")) return;
 
     try {
       setDeletingId(despesaId);
-      const response = await fetch(`/api/planos/${planoId}/despesas/${despesaId}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `/api/planos/${planoId}/despesas/${despesaId}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       if (response.ok) {
         await carregarDespesas();
+        // Refresh parent data to sync total values
+        if (onRefresh) {
+          await onRefresh();
+        }
       } else {
         const error = await response.json();
-        alert(error.error || 'Erro ao excluir despesa');
+        alert(error.error || "Erro ao excluir despesa");
       }
     } catch (error) {
-      console.error('Erro ao excluir despesa:', error);
-      alert('Erro ao excluir despesa');
+      console.error("Erro ao excluir despesa:", error);
+      alert("Erro ao excluir despesa");
     } finally {
       setDeletingId(null);
     }
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(value);
   };
 
   const calcularTotais = () => {
-    const totalGeral = despesas.reduce((sum, d) => sum + Number(d.valorCalculado), 0);
+    const totalGeral = despesas.reduce(
+      (sum, d) => sum + Number(d.valorCalculado),
+      0
+    );
     const totalCombustivel = despesas
-      .filter(d => d.valorCombustivel !== null)
+      .filter((d) => d.valorCombustivel !== null)
       .reduce((sum, d) => sum + Number(d.valorCombustivel!), 0);
 
     return { totalGeral, totalCombustivel };
@@ -134,11 +159,17 @@ export function DespesasLogistico({ planoId, oms, operacao, canEdit }: DespesasL
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Despesas Logísticas</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Despesas Logísticas
+          </h3>
           <p className="text-sm text-gray-600">
             {despesas.length === 0
-              ? 'Nenhuma despesa cadastrada'
-              : `${despesas.length} ${despesas.length === 1 ? 'despesa cadastrada' : 'despesas cadastradas'}`}
+              ? "Nenhuma despesa cadastrada"
+              : `${despesas.length} ${
+                  despesas.length === 1
+                    ? "despesa cadastrada"
+                    : "despesas cadastradas"
+                }`}
           </p>
         </div>
         {canEdit && (
@@ -160,7 +191,7 @@ export function DespesasLogistico({ planoId, oms, operacao, canEdit }: DespesasL
           <p className="text-sm text-gray-500">
             {canEdit
               ? 'Clique em "Nova Despesa" para adicionar a primeira despesa logística'
-              : 'Este plano ainda não possui despesas cadastradas'}
+              : "Este plano ainda não possui despesas cadastradas"}
           </p>
         </div>
       ) : (
@@ -177,17 +208,23 @@ export function DespesasLogistico({ planoId, oms, operacao, canEdit }: DespesasL
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-800">
                         {despesa.classe.nome}
                       </span>
-                      <span className="text-sm text-gray-600">
-                        {despesa.tipo.nome}
-                        {despesa.tipo.isCombustivel && ' (Combustível)'}
-                      </span>
+                      {despesa.tipo && (
+                        <span className="text-sm text-gray-600">
+                          {despesa.tipo.nome}
+                          {despesa.tipo.isCombustivel && " (Combustível)"}
+                        </span>
+                      )}
                     </div>
 
-                    <h4 className="font-medium text-gray-900 mb-2">{despesa.descricao}</h4>
+                    <h4 className="font-medium text-gray-900 mb-2">
+                      {despesa.descricao}
+                    </h4>
 
                     <div className="grid grid-cols-2 gap-4 mb-3">
                       <div>
-                        <p className="text-xs text-gray-500 mb-1">Valor Total</p>
+                        <p className="text-xs text-gray-500 mb-1">
+                          Valor Total
+                        </p>
                         <p className="text-lg font-bold text-green-700">
                           {formatCurrency(Number(despesa.valorCalculado))}
                         </p>
@@ -195,36 +232,54 @@ export function DespesasLogistico({ planoId, oms, operacao, canEdit }: DespesasL
 
                       {despesa.valorCombustivel !== null && (
                         <div>
-                          <p className="text-xs text-gray-500 mb-1">Combustível</p>
+                          <p className="text-xs text-gray-500 mb-1">
+                            Combustível
+                          </p>
                           <p className="text-sm font-semibold text-gray-900">
-                            {Number(despesa.valorCombustivel).toLocaleString('pt-BR', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })} L
+                            {Number(despesa.valorCombustivel).toLocaleString(
+                              "pt-BR",
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              }
+                            )}{" "}
+                            L
                           </p>
                         </div>
                       )}
                     </div>
 
                     <div className="mb-3">
-                      <p className="text-xs text-gray-500 mb-1">Naturezas de Despesa</p>
-                      <div className="flex flex-wrap gap-1">
-                        {despesa.naturezas.map((nat) => (
-                          <span
-                            key={nat}
-                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-100 text-gray-700"
+                      <p className="text-xs text-gray-500 mb-1">
+                        Naturezas de Despesa
+                      </p>
+                      <div className="space-y-1">
+                        {despesa.despesasNaturezas.map((rateio) => (
+                          <div
+                            key={rateio.id}
+                            className="flex items-center justify-between text-xs"
                           >
-                            {nat}
-                          </span>
+                            <span className="text-gray-700 font-mono">
+                              {rateio.natureza.codigo} - {rateio.natureza.nome}
+                            </span>
+                            <span className="font-medium text-gray-900">
+                              {Number(rateio.percentual).toFixed(2)}%
+                            </span>
+                          </div>
                         ))}
                       </div>
                     </div>
 
                     <div>
-                      <p className="text-xs text-gray-500 mb-1">Rateio por OMs</p>
+                      <p className="text-xs text-gray-500 mb-1">
+                        Rateio por OMs
+                      </p>
                       <div className="space-y-1">
                         {despesa.oms.map((rateio) => (
-                          <div key={rateio.id} className="flex items-center justify-between text-xs">
+                          <div
+                            key={rateio.id}
+                            className="flex items-center justify-between text-xs"
+                          >
                             <span className="text-gray-700">
                               {rateio.om.sigla} - {rateio.om.nome}
                             </span>
@@ -258,7 +313,9 @@ export function DespesasLogistico({ planoId, oms, operacao, canEdit }: DespesasL
 
           {/* Totais */}
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="text-sm font-semibold text-green-800 mb-3">Resumo Financeiro</h4>
+            <h4 className="text-sm font-semibold text-green-800 mb-3">
+              Resumo Financeiro
+            </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-xs text-green-700 mb-1">Total Geral</p>
@@ -269,12 +326,15 @@ export function DespesasLogistico({ planoId, oms, operacao, canEdit }: DespesasL
 
               {totalCombustivel > 0 && (
                 <div>
-                  <p className="text-xs text-green-700 mb-1">Total de Combustível</p>
+                  <p className="text-xs text-green-700 mb-1">
+                    Total de Combustível
+                  </p>
                   <p className="text-lg font-semibold text-green-800">
-                    {totalCombustivel.toLocaleString('pt-BR', {
+                    {totalCombustivel.toLocaleString("pt-BR", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
-                    })} L
+                    })}{" "}
+                    L
                   </p>
                 </div>
               )}
@@ -291,7 +351,7 @@ export function DespesasLogistico({ planoId, oms, operacao, canEdit }: DespesasL
           planoId={planoId}
           oms={oms}
           operacao={operacao}
-          onSuccess={carregarDespesas}
+          onSuccess={handleDespesaSuccess}
         />
       )}
     </div>

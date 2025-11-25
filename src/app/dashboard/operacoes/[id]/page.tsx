@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { ArrowLeft, Plus, Calendar, Users, FileText, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, Users, FileText, AlertCircle, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -11,7 +11,8 @@ import { ptBR } from 'date-fns/locale';
 interface Operacao {
   id: string;
   nome: string;
-  efetivo: number;
+  efetivoMil: number;
+  efetivoExt?: number;
   dataInicio: string;
   dataFinal: string;
   status: string;
@@ -46,6 +47,7 @@ export default function OperacaoDetailPage() {
 
   const [operacao, setOperacao] = useState<Operacao | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -85,6 +87,31 @@ export default function OperacaoDetailPage() {
       CRITICA: 'bg-red-100 text-red-800',
     };
     return colors[prioridade as keyof typeof colors] || 'bg-olive-100 text-olive-800';
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Tem certeza que deseja excluir esta operação? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/operacoes/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        router.push('/dashboard/operacoes');
+      } else {
+        const error = await response.json();
+        alert(`Erro ao excluir operação: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting operacao:', error);
+      alert('Erro ao excluir operação');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (isLoading) {
@@ -138,6 +165,15 @@ export default function OperacaoDetailPage() {
             >
               {operacao.status.replace('_', ' ')}
             </span>
+            <Button
+              variant="secondary"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-50 text-red-700 hover:bg-red-100 border-red-200"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              {isDeleting ? 'Excluindo...' : 'Excluir'}
+            </Button>
           </div>
         </div>
       </div>
@@ -149,8 +185,12 @@ export default function OperacaoDetailPage() {
             <Users className="w-5 h-5 text-military-600" />
             <div className="text-sm text-olive-700">Efetivo</div>
           </div>
-          <div className="text-2xl font-bold text-military-900">{operacao.efetivo}</div>
+          <div className="text-2xl font-bold text-military-900">{operacao.efetivoMil}</div>
           <div className="text-xs text-olive-600 mt-1">militares</div>
+          <div className="text-2xl font-bold text-military-900">
+            {operacao.efetivoExt ? operacao.efetivoExt : 0}
+          </div>
+          <div className="text-xs text-olive-600 mt-1">agentes externos</div>
         </div>
 
         <div className="bg-white p-6 rounded-lg border border-olive-200">

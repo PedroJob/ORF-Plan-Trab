@@ -10,7 +10,8 @@ import { ptBR } from 'date-fns/locale';
 interface Operacao {
   id: string;
   nome: string;
-  efetivo: number;
+  efetivoMil: number;
+  efetivoExt?: number;
   dataInicio: string;
   dataFinal: string;
   status: string;
@@ -117,7 +118,7 @@ export default function OperacoesPage() {
               <div className="space-y-2 mb-4">
                 <div className="flex items-center text-sm text-gray-600">
                   <Users className="w-4 h-4 mr-2" />
-                  {operacao.efetivo} militares
+                  {operacao.efetivoMil} militares {operacao.efetivoExt ? ` - ${operacao.efetivoExt} externos` : null}
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <Calendar className="w-4 h-4 mr-2" />

@@ -91,16 +91,17 @@ model Anotacao {
 }
 
 model AprovacaoHistorico {
-  id              String        @id @default(cuid())
-  acao            AcaoAprovacao
-  motivo          String?
-  planoTrabalhoId String        @map("plano_trabalho_id")
-  aprovadorId     String        @map("aprovador_id")
-  omNivelId       String        @map("om_nivel_id")
-  dataAcao        DateTime      @default(now()) @map("data_acao")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  aprovador       User          @relation(fields: [aprovadorId], references: [id])
-  planoTrabalho   PlanoTrabalho @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
+  id               String        @id @default(cuid())
+  acao             AcaoAprovacao
+  motivo           String?
+  nivelHierarquico Int           @map("nivel_hierarquico")
+  planoTrabalhoId  String        @map("plano_trabalho_id")
+  aprovadorId      String        @map("aprovador_id")
+  omNivelId        String        @map("om_nivel_id")
+  dataAcao         DateTime      @default(now()) @map("data_acao")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  aprovador        User          @relation(fields: [aprovadorId], references: [id])
+  planoTrabalho    PlanoTrabalho @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
 
   @@index([aprovadorId])
   @@index([dataAcao])
@@ -133,6 +134,7 @@ model Classe {
   id                        String        @id @default(cuid())
   nome                      ClasseDespesa @unique
   descricao                 String
+  gnd                       String        @default("GND 3")
   naturezasPermitidas       String[]
   possuiCalculoAutomatizado Boolean
   createdAt                 DateTime      @default(now()) @map("created_at")
@@ -145,21 +147,21 @@ model Classe {
 }
 
 model Despesa {
-  id               String        @id @default(cuid())
+  id               String             @id @default(cuid())
   descricao        String
-  planoTrabalhoId  String        @map("plano_trabalho_id")
-  classeId         String        @map("classe_id")
-  tipoId           String        @map("tipo_id")
+  planoTrabalhoId  String             @map("plano_trabalho_id")
+  classeId         String             @map("classe_id")
+  tipoId           String?            @map("tipo_id")
   parametros       Json
-  valorCalculado   Decimal       @map("valor_calculado") @db.Decimal(15, 2)
-  valorCombustivel Decimal?      @map("valor_combustivel") @db.Decimal(15, 2)
-  naturezas        String[]
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
-  classe           Classe        @relation(fields: [classeId], references: [id])
-  planoTrabalho    PlanoTrabalho @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
-  tipo             Tipo          @relation(fields: [tipoId], references: [id])
+  valorCalculado   Decimal            @map("valor_calculado") @db.Decimal(15, 2)
+  valorCombustivel Decimal?           @map("valor_combustivel") @db.Decimal(15, 2)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  classe           Classe             @relation(fields: [classeId], references: [id])
+  planoTrabalho    PlanoTrabalho      @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
+  tipo             Tipo?              @relation(fields: [tipoId], references: [id])
   oms              DespesaOM[]
+  despesasNaturezas DespesaNatureza[]
 
   @@index([classeId])
   @@index([planoTrabalhoId])
@@ -182,6 +184,22 @@ model DespesaOM {
   @@map("despesas_om")
 }
 
+model DespesaNatureza {
+  id         String          @id @default(cuid())
+  despesaId  String          @map("despesa_id")
+  naturezaId String          @map("natureza_id")
+  percentual Decimal         @db.Decimal(5, 2)
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  despesa    Despesa         @relation(fields: [despesaId], references: [id], onDelete: Cascade)
+  natureza   NaturezaDespesa @relation(fields: [naturezaId], references: [id])
+
+  @@unique([despesaId, naturezaId])
+  @@index([despesaId])
+  @@index([naturezaId])
+  @@map("despesas_naturezas")
+}
+
 model DocumentoReferencia {
   id              String        @id @default(cuid())
   nome            String
@@ -200,35 +218,37 @@ model DocumentoReferencia {
 }
 
 model NaturezaDespesa {
-  id        String   @id @default(cuid())
-  codigo    String   @unique
+  id        String            @id @default(cuid())
+  codigo    String            @unique
   nome      String
   descricao String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  despesas  DespesaNatureza[]
 
   @@index([codigo])
   @@map("naturezas_despesa")
 }
 
 model Operacao {
-  id                           String             @id @default(cuid())
-  nome                         String
-  efetivo                      Int
-  dataInicio                   DateTime           @map("data_inicio")
-  dataFinal                    DateTime           @map("data_final")
-  status                       StatusPlano        @default(RASCUNHO)
-  prioridade                   Prioridade         @default(MEDIA)
-  finalidade                   String?
-  motivacao                    String?
-  consequenciaNaoAtendimento   String?            @map("consequencia_nao_atendimento")
-  observacoes                  String?
-  omId                         String             @map("om_id")
-  createdAt                    DateTime           @default(now()) @map("created_at")
-  updatedAt                    DateTime           @updatedAt @map("updated_at")
-  auditoriaLogs                AuditoriaLog[]
-  om                           OrganizacaoMilitar @relation(fields: [omId], references: [id])
-  planosTrabalho               PlanoTrabalho[]
+  id                         String             @id @default(cuid())
+  nome                       String
+  efetivoMil                 Int                @map("efetivo_mil")
+  efetivoExt                 Int?                @map("efetivo_ext")
+  dataInicio                 DateTime           @map("data_inicio")
+  dataFinal                  DateTime           @map("data_final")
+  status                     StatusPlano        @default(RASCUNHO)
+  prioridade                 Prioridade         @default(MEDIA)
+  finalidade                 String?
+  motivacao                  String?
+  consequenciaNaoAtendimento String?            @map("consequencia_nao_atendimento")
+  observacoes                String?
+  omId                       String             @map("om_id")
+  createdAt                  DateTime           @default(now()) @map("created_at")
+  updatedAt                  DateTime           @updatedAt @map("updated_at")
+  auditoriaLogs              AuditoriaLog[]
+  om                         OrganizacaoMilitar @relation(fields: [omId], references: [id])
+  planosTrabalho             PlanoTrabalho[]
 
   @@index([dataFinal])
   @@index([dataInicio])
@@ -238,19 +258,19 @@ model Operacao {
 }
 
 model OrganizacaoMilitar {
-  id                     String               @id @default(cuid())
-  nome                   String
-  sigla                  String
-  tipo                   TipoOM
-  codUG                  String               @unique @map("cod_ug")
-  omPaiId                String?              @map("om_pai_id")
-  createdAt              DateTime             @default(now()) @map("created_at")
-  updatedAt              DateTime             @updatedAt @map("updated_at")
-  despesasOm             DespesaOM[]
-  operacoes              Operacao[]
-  omPai                  OrganizacaoMilitar?  @relation("OMHierarchy", fields: [omPaiId], references: [id], onDelete: Restrict)
-  omsFilhas              OrganizacaoMilitar[] @relation("OMHierarchy")
-  users                  User[]
+  id         String               @id @default(cuid())
+  nome       String
+  sigla      String
+  tipo       TipoOM
+  codUG      String               @unique @map("cod_ug")
+  omPaiId    String?              @map("om_pai_id")
+  createdAt  DateTime             @default(now()) @map("created_at")
+  updatedAt  DateTime             @updatedAt @map("updated_at")
+  despesasOm DespesaOM[]
+  operacoes  Operacao[]
+  omPai      OrganizacaoMilitar?  @relation("OMHierarchy", fields: [omPaiId], references: [id], onDelete: Restrict)
+  omsFilhas  OrganizacaoMilitar[] @relation("OMHierarchy")
+  users      User[]
 
   @@index([codUG])
   @@index([omPaiId])
@@ -259,23 +279,27 @@ model OrganizacaoMilitar {
 }
 
 model PlanoTrabalho {
-  id                   String                 @id @default(cuid())
+  id                   String                @id @default(cuid())
   titulo               String
-  versao               Int                    @default(1)
-  operacaoId           String                 @map("operacao_id")
-  responsavelId        String                 @map("responsavel_id")
-  status               StatusPlano            @default(RASCUNHO)
-  prioridade           Prioridade             @default(MEDIA)
-  createdAt            DateTime               @default(now()) @map("created_at")
-  updatedAt            DateTime               @updatedAt @map("updated_at")
-  tipo                 TipoPlano              @default(LOGISTICO)
+  versao               Int                   @default(1)
+  operacaoId           String                @map("operacao_id")
+  responsavelId        String                @map("responsavel_id")
+  status               StatusPlano           @default(RASCUNHO)
+  prioridade           Prioridade            @default(MEDIA)
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  tipo                 TipoPlano             @default(LOGISTICO)
+  valorTotalDespesas   Decimal?              @default(0) @map("valor_total_despesas") @db.Decimal(15, 2)
+  nivelAprovacaoAtual  Int?                  @map("nivel_aprovacao_atual")
+  dataEnvioAnalise     DateTime?             @map("data_envio_analise")
+  dataBloqueio         DateTime?             @map("data_bloqueio")
   anotacoes            Anotacao[]
   aprovacoesHistorico  AprovacaoHistorico[]
   auditoriaLogs        AuditoriaLog[]
   despesas             Despesa[]
   documentosReferencia DocumentoReferencia[]
-  operacao             Operacao               @relation(fields: [operacaoId], references: [id], onDelete: Cascade)
-  responsavel          User                   @relation(fields: [responsavelId], references: [id])
+  operacao             Operacao              @relation(fields: [operacaoId], references: [id], onDelete: Cascade)
+  responsavel          User                  @relation(fields: [responsavelId], references: [id])
 
   @@unique([operacaoId, versao])
   @@index([operacaoId])
@@ -286,39 +310,39 @@ model PlanoTrabalho {
 }
 
 model Tipo {
-  id               String  @id @default(cuid())
+  id               String    @id @default(cuid())
   nome             String
-  classeId         String  @map("classe_id")
-  isCombustivel    Boolean @default(false)
-  isCriavelUsuario Boolean @default(true)
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  classeId         String    @map("classe_id")
+  isCombustivel    Boolean   @default(false)
+  isCriavelUsuario Boolean   @default(true)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
   despesas         Despesa[]
-  classe           Classe  @relation(fields: [classeId], references: [id], onDelete: Cascade)
+  classe           Classe    @relation(fields: [classeId], references: [id], onDelete: Cascade)
 
   @@index([classeId])
   @@map("tipos")
 }
 
 model User {
-  id                   String                 @id @default(cuid())
-  email                String                 @unique
-  passwordHash         String                 @map("password_hash")
-  nomeCompleto         String                 @map("nome_completo")
-  nomeGuerra           String?                @map("nome_guerra")
-  postoGraduacao       String                 @map("posto_graduacao")
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  passwordHash         String                @map("password_hash")
+  nomeCompleto         String                @map("nome_completo")
+  nomeGuerra           String?               @map("nome_guerra")
+  postoGraduacao       String                @map("posto_graduacao")
   telefone             String?
   role                 Role
-  isActive             Boolean                @default(true) @map("is_active")
-  omId                 String                 @map("om_id")
-  createdAt            DateTime               @default(now()) @map("created_at")
-  updatedAt            DateTime               @updatedAt @map("updated_at")
+  isActive             Boolean               @default(true) @map("is_active")
+  omId                 String                @map("om_id")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
   anotacoes            Anotacao[]
   aprovacoesHistorico  AprovacaoHistorico[]
   auditoriaLogs        AuditoriaLog[]
   documentosReferencia DocumentoReferencia[]
   planosTrabalho       PlanoTrabalho[]
-  om                   OrganizacaoMilitar     @relation(fields: [omId], references: [id])
+  om                   OrganizacaoMilitar    @relation(fields: [omId], references: [id])
 
   @@index([email])
   @@index([omId])
