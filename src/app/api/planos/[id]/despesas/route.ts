@@ -70,12 +70,14 @@ export async function GET(
       include: {
         classe: {
           select: {
+            id: true,
             nome: true,
             descricao: true,
           },
         },
         tipo: {
           select: {
+            id: true,
             nome: true,
             isCombustivel: true,
           },
@@ -170,7 +172,7 @@ export async function POST(
     if (
       !user ||
       (plano.responsavelId !== user.id &&
-        !["CMT_OM", "CMT_BRIGADA", "CMT_CMA", "SUPER_ADMIN"].includes(
+        !["S4", "COMANDANTE", "SUPER_ADMIN"].includes(
           user.role
         ))
     ) {

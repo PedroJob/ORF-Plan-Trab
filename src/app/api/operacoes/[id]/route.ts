@@ -25,8 +25,27 @@ export async function GET(
             tipo: true,
           },
         },
+        omsParticipantes: {
+          include: {
+            om: {
+              select: {
+                id: true,
+                nome: true,
+                sigla: true,
+                tipo: true,
+              },
+            },
+          },
+        },
         planosTrabalho: {
           include: {
+            om: {
+              select: {
+                id: true,
+                nome: true,
+                sigla: true,
+              },
+            },
             responsavel: {
               select: {
                 id: true,

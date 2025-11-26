@@ -25,10 +25,29 @@ import type {
   RateioOM,
   RateioNatureza,
   HandleParametrosChange,
+  UserOM,
 } from "@/types/despesas";
 
 // Re-export for use by other components
 export type { HandleParametrosChange };
+
+interface DespesaToEdit {
+  id: string;
+  classeId: string;
+  tipoId: string | null;
+  descricao: string;
+  parametros: unknown;
+  valorCalculado: number;
+  valorCombustivel: number | null;
+  oms: Array<{
+    omId: string;
+    percentual: number;
+  }>;
+  despesasNaturezas: Array<{
+    naturezaId: string;
+    percentual: number;
+  }>;
+}
 
 interface ModalCriarDespesaProps {
   isOpen: boolean;
@@ -37,6 +56,8 @@ interface ModalCriarDespesaProps {
   oms: OMSelect[];
   operacao: OperacaoWithEfetivo;
   onSuccess: () => void;
+  despesaToEdit?: DespesaToEdit | null;
+  userOm: UserOM | null;
 }
 
 export function ModalCriarDespesa({
@@ -46,6 +67,8 @@ export function ModalCriarDespesa({
   oms,
   operacao,
   onSuccess,
+  despesaToEdit = null,
+  userOm,
 }: ModalCriarDespesaProps) {
   const [loading, setLoading] = useState(false);
   const [loadingClasses, setLoadingClasses] = useState(true);
@@ -79,26 +102,62 @@ export function ModalCriarDespesa({
     if (isOpen) {
       carregarClasses();
       carregarNaturezas();
-      resetForm();
+
+      if (despesaToEdit) {
+        // Preencher com dados da despesa existente
+        setClasseId(despesaToEdit.classeId);
+        setDescricao(despesaToEdit.descricao);
+        setParametros(despesaToEdit.parametros);
+        setValorTotal(despesaToEdit.valorCalculado);
+        setValorCombustivel(despesaToEdit.valorCombustivel || undefined);
+        setRateioOMs(
+          despesaToEdit.oms.map((om) => ({
+            omId: om.omId,
+            percentual: om.percentual,
+          }))
+        );
+        setRateioNaturezas(
+          despesaToEdit.despesasNaturezas.map((nat) => ({
+            naturezaId: nat.naturezaId,
+            percentual: nat.percentual,
+          }))
+        );
+      } else {
+        resetForm();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, despesaToEdit]);
 
   useEffect(() => {
     if (classeId) {
       carregarTipos(classeId);
-      setTipoSelecionado(null);
-      setParametros(null);
-      setRateioNaturezas([]);
+
+      // Não resetar se estiver editando
+      if (!despesaToEdit) {
+        setTipoSelecionado(null);
+        setParametros(null);
+        setRateioNaturezas([]);
+      }
     }
   }, [classeId]);
+
+  // Selecionar o tipo quando estiver editando e os tipos forem carregados
+  useEffect(() => {
+    if (despesaToEdit && despesaToEdit.tipoId && tipos.length > 0) {
+      const tipo = tipos.find((t) => t.id === despesaToEdit.tipoId);
+      if (tipo) {
+        setTipoSelecionado(tipo);
+      }
+    }
+  }, [despesaToEdit, tipos]);
 
   // Auto-seleciona um tipo dummy quando não há tipos disponíveis
   useEffect(() => {
     if (classeId && !loadingTipos && tipos.length === 0) {
       // Cria um tipo dummy para permitir o uso do formulário
       setTipoSelecionado({
-        id: 'NO_TYPE',
-        nome: 'Sem tipo específico',
+        id: "NO_TYPE",
+        nome: "Sem tipo específico",
         classeId,
         isCombustivel: false,
         isCriavelUsuario: false,
@@ -225,7 +284,8 @@ export function ModalCriarDespesa({
 
     if (!classeId) newErrors.classeId = "Selecione uma classe";
     // Só exige tipo se houver tipos disponíveis
-    if (!tipoSelecionado && tipos.length > 0) newErrors.tipoId = "Selecione um tipo";
+    if (!tipoSelecionado && tipos.length > 0)
+      newErrors.tipoId = "Selecione um tipo";
     if (rateioOMs.length === 0)
       newErrors.rateioOMs = "Adicione ao menos uma OM";
 
@@ -268,12 +328,20 @@ export function ModalCriarDespesa({
     try {
       setLoading(true);
       console.log({ valorTotal, valorCombustivel });
-      const response = await fetch(`/api/planos/${planoId}/despesas`, {
-        method: "POST",
+
+      const isEditing = !!despesaToEdit;
+      const url = isEditing
+        ? `/api/planos/${planoId}/despesas/${despesaToEdit.id}`
+        : `/api/planos/${planoId}/despesas`;
+      const method = isEditing ? "PATCH" : "POST";
+
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           classeId,
-          tipoId: tipoSelecionado?.id === 'NO_TYPE' ? null : tipoSelecionado?.id,
+          tipoId:
+            tipoSelecionado?.id === "NO_TYPE" ? null : tipoSelecionado?.id,
           descricao: descricao.trim(),
           parametros,
           oms: rateioOMs,
@@ -289,11 +357,16 @@ export function ModalCriarDespesa({
         resetForm();
       } else {
         const error = await response.json();
-        alert(error.error || "Erro ao criar despesa");
+        alert(
+          error.error || `Erro ao ${isEditing ? "editar" : "criar"} despesa`
+        );
       }
     } catch (error) {
-      console.error("Erro ao criar despesa:", error);
-      alert("Erro ao criar despesa");
+      console.error(
+        `Erro ao ${despesaToEdit ? "editar" : "criar"} despesa:`,
+        error
+      );
+      alert(`Erro ao ${despesaToEdit ? "editar" : "criar"} despesa`);
     } finally {
       setLoading(false);
     }
@@ -320,6 +393,7 @@ export function ModalCriarDespesa({
             tipo={tipoSelecionado}
             onChange={handleParametrosChange}
             operacao={operacao}
+            userOm={userOm}
           />
         );
       case "CLASSE_II":
@@ -328,6 +402,7 @@ export function ModalCriarDespesa({
             operacao={operacao}
             value={parametros as any}
             onChange={handleParametrosChange}
+            userOm={userOm}
           />
         );
       case "CLASSE_III":
@@ -338,6 +413,7 @@ export function ModalCriarDespesa({
             operacao={operacao}
             value={parametros as any}
             onChange={handleParametrosChange}
+            userOm={userOm}
           />
         );
       case "CLASSE_IV":
@@ -345,6 +421,8 @@ export function ModalCriarDespesa({
           <FormularioClasseIV
             value={parametros as any}
             onChange={handleParametrosChange}
+            operacao={operacao}
+            userOm={userOm}
           />
         );
       case "CLASSE_V":
@@ -352,6 +430,8 @@ export function ModalCriarDespesa({
           <FormularioClasseV
             value={parametros as any}
             onChange={handleParametrosChange}
+            operacao={operacao}
+            userOm={userOm}
           />
         );
       case "CLASSE_VI":
@@ -359,6 +439,8 @@ export function ModalCriarDespesa({
           <FormularioClasseVI
             value={parametros as any}
             onChange={handleParametrosChange}
+            operacao={operacao}
+            userOm={userOm}
           />
         );
       case "CLASSE_VII":
@@ -366,6 +448,8 @@ export function ModalCriarDespesa({
           <FormularioClasseVII
             value={parametros as any}
             onChange={handleParametrosChange}
+            operacao={operacao}
+            userOm={userOm}
           />
         );
       case "CLASSE_VIII":
@@ -373,6 +457,8 @@ export function ModalCriarDespesa({
           <FormularioClasseVIII
             value={parametros as any}
             onChange={handleParametrosChange}
+            operacao={operacao}
+            userOm={userOm}
           />
         );
       case "CLASSE_IX":
@@ -380,6 +466,8 @@ export function ModalCriarDespesa({
           <FormularioClasseIX
             value={parametros as any}
             onChange={handleParametrosChange}
+            operacao={operacao}
+            userOm={userOm}
           />
         );
       case "CLASSE_X":
@@ -387,6 +475,8 @@ export function ModalCriarDespesa({
           <FormularioClasseX
             value={parametros as any}
             onChange={handleParametrosChange}
+            operacao={operacao}
+            userOm={userOm}
           />
         );
       default:
@@ -402,7 +492,9 @@ export function ModalCriarDespesa({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="text-xl font-bold text-gray-900">
-            Nova Despesa Logística
+            {despesaToEdit
+              ? "Editar Despesa Logística"
+              : "Nova Despesa Logística"}
           </h2>
           <button
             onClick={onClose}
@@ -587,7 +679,7 @@ export function ModalCriarDespesa({
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Criar Despesa
+            {despesaToEdit ? "Salvar Alterações" : "Criar Despesa"}
           </button>
         </div>
       </div>

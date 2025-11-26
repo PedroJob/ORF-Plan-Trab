@@ -5,35 +5,31 @@ export interface ItemManutencao {
   periodoDias: number;
 }
 
-export type TipoMaterialClasseII = 'EQUIPAMENTO_INDIVIDUAL' | 'MATERIAL_BALISTICO' | 'ESTACIONAMENTO_ALOJAMENTO' | 'FARDAMENTO';
+export type TipoMaterialClasseII =
+  | "EQUIPAMENTO_INDIVIDUAL"
+  | "MATERIAL_BALISTICO"
+  | "ESTACIONAMENTO_ALOJAMENTO";
 
 export interface MaterialEquipamentoIndividual {
-  tipo: 'EQUIPAMENTO_INDIVIDUAL';
+  tipo: "EQUIPAMENTO_INDIVIDUAL";
   numeroMilitares: number;
   periodoDias: number;
 }
 
 export interface MaterialBalistico {
-  tipo: 'MATERIAL_BALISTICO';
-  numeroUsuarios: number;
-  periodoDias: number;
-}
-
-export interface MaterialEstacionamento {
-  tipo: 'ESTACIONAMENTO_ALOJAMENTO';
+  tipo: "MATERIAL_BALISTICO";
   itens: ItemManutencao[];
 }
 
-export interface MaterialFardamento {
-  tipo: 'FARDAMENTO';
-  valorFardamento: number;
+export interface MaterialEstacionamento {
+  tipo: "ESTACIONAMENTO_ALOJAMENTO";
+  itens: ItemManutencao[];
 }
 
 export type MaterialClasseII =
   | MaterialEquipamentoIndividual
   | MaterialBalistico
-  | MaterialEstacionamento
-  | MaterialFardamento;
+  | MaterialEstacionamento;
 
 export interface ParametrosClasseII {
   materiais: MaterialClasseII[];
@@ -41,7 +37,12 @@ export interface ParametrosClasseII {
 
 // Interface antiga mantida para compatibilidade
 export interface ParametrosClasseIILegacy {
-  tipoCalculo: 'EQUIPAMENTO_INDIVIDUAL' | 'MATERIAL_BALISTICO' | 'ESTACIONAMENTO_ALOJAMENTO' | 'FARDAMENTO' | 'PERSONALIZADO';
+  tipoCalculo:
+    | "EQUIPAMENTO_INDIVIDUAL"
+    | "MATERIAL_BALISTICO"
+    | "ESTACIONAMENTO_ALOJAMENTO"
+    | "FARDAMENTO"
+    | "PERSONALIZADO";
   numeroMilitares?: number;
   periodoDias?: number;
   numeroUsuarios?: number;
@@ -82,10 +83,14 @@ export function calcularEquipamentoIndividual(
   periodoDias: number
 ): number {
   if (numeroMilitares <= 0 || periodoDias <= 0) {
-    throw new Error('Número de militares e período devem ser maiores que zero');
+    throw new Error("Número de militares e período devem ser maiores que zero");
   }
 
-  return numeroMilitares * VALORES_MANUTENCAO.EQUIPAMENTO_INDIVIDUAL_DIA * periodoDias;
+  return (
+    numeroMilitares *
+    VALORES_MANUTENCAO.EQUIPAMENTO_INDIVIDUAL_DIA *
+    periodoDias
+  );
 }
 
 /**
@@ -97,7 +102,7 @@ export function calcularMaterialBalistico(
   periodoDias: number
 ): number {
   if (numeroUsuarios <= 0 || periodoDias <= 0) {
-    throw new Error('Número de usuários e período devem ser maiores que zero');
+    throw new Error("Número de usuários e período devem ser maiores que zero");
   }
 
   return numeroUsuarios * VALORES_MANUTENCAO.BALISTICO_TOTAL_DIA * periodoDias;
@@ -109,7 +114,7 @@ export function calcularMaterialBalistico(
  */
 export function calcularItens(itens: ItemManutencao[]): number {
   if (!itens || itens.length === 0) {
-    throw new Error('Deve haver pelo menos um item');
+    throw new Error("Deve haver pelo menos um item");
   }
 
   let total = 0;
@@ -128,100 +133,139 @@ export function calcularItens(itens: ItemManutencao[]): number {
 /**
  * Calcula o valor de um único material e gera a string do carimbo
  */
-function calcularMaterial(material: MaterialClasseII): { valor: number; carimboTexto: string } {
+function calcularMaterial(material: MaterialClasseII): {
+  valor: number;
+  carimboTexto: string;
+} {
   let valor = 0;
-  let carimboTexto = '';
+  let carimboTexto = "";
 
   switch (material.tipo) {
-    case 'EQUIPAMENTO_INDIVIDUAL': {
-      valor = calcularEquipamentoIndividual(material.numeroMilitares, material.periodoDias);
+    case "EQUIPAMENTO_INDIVIDUAL": {
+      valor = calcularEquipamentoIndividual(
+        material.numeroMilitares,
+        material.periodoDias
+      );
 
       carimboTexto = `EQUIPAMENTO INDIVIDUAL (cantil, caneco, cinto de campanha, marmita, mochilas, saco de campanha):
-Memória de cálculo: ${material.numeroMilitares} (militares empregados) x R$ ${VALORES_MANUTENCAO.EQUIPAMENTO_INDIVIDUAL_DIA.toFixed(2)} (custo de mnt diário) x ${material.periodoDias} dias = R$ ${valor.toFixed(2)}`;
+Memória de cálculo: ${
+        material.numeroMilitares
+      } (militares empregados) x R$ ${VALORES_MANUTENCAO.EQUIPAMENTO_INDIVIDUAL_DIA.toFixed(
+        2
+      )} (custo de mnt diário) x ${
+        material.periodoDias
+      } dias = R$ ${valor.toFixed(2)}`;
       break;
     }
 
-    case 'MATERIAL_BALISTICO': {
-      valor = calcularMaterialBalistico(material.numeroUsuarios, material.periodoDias);
+    case "MATERIAL_BALISTICO": {
+      valor = calcularItens(material.itens);
 
-      carimboTexto = `MATERIAL BALÍSTICO (capacete balístico, colete balístico):
-Memória de cálculo: ${material.numeroUsuarios} (militares empregados) x R$ ${VALORES_MANUTENCAO.BALISTICO_TOTAL_DIA.toFixed(2)} (custo de mnt diário) x ${material.periodoDias} dias = R$ ${valor.toFixed(2)}`;
+      carimboTexto = `MATERIAL BALÍSTICO:\n`;
+      material.itens.forEach((item) => {
+        const subtotal = item.quantidade * item.mntDia * item.periodoDias;
+        carimboTexto += `  ${item.tipo}: ${item.quantidade} × R$ ${item.mntDia.toFixed(2)}/dia × ${item.periodoDias} dias = R$ ${subtotal.toFixed(2)}\n`;
+      });
+      carimboTexto += `Total: R$ ${valor.toFixed(2)}`;
       break;
     }
 
-    case 'ESTACIONAMENTO_ALOJAMENTO': {
+    case "ESTACIONAMENTO_ALOJAMENTO": {
       valor = calcularItens(material.itens);
 
       // Agrupar itens por tipo (estacionamento vs alojamento)
-      const itensEstacionamento = material.itens.filter(item =>
-        ['Barraca de Campanha', 'Toldo', 'Barraca Individual', 'Cama'].some(tipo =>
+      const itensEstacionamento = material.itens.filter((item) =>
+        ["Barraca de Campanha", "Toldo", "Barraca Individual", "Cama"].some(
+          (tipo) => item.tipo.toLowerCase().includes(tipo.toLowerCase())
+        )
+      );
+
+      const itensAlojamento = material.itens.filter((item) =>
+        ["Beliche", "Armário", "Colchão"].some((tipo) =>
           item.tipo.toLowerCase().includes(tipo.toLowerCase())
         )
       );
 
-      const itensAlojamento = material.itens.filter(item =>
-        ['Beliche', 'Armário', 'Colchão'].some(tipo =>
-          item.tipo.toLowerCase().includes(tipo.toLowerCase())
-        )
+      const itensOutros = material.itens.filter(
+        (item) =>
+          !itensEstacionamento.includes(item) && !itensAlojamento.includes(item)
       );
 
-      const itensOutros = material.itens.filter(item =>
-        !itensEstacionamento.includes(item) && !itensAlojamento.includes(item)
-      );
-
-      let sections: string[] = [];
+      const sections: string[] = [];
 
       if (itensEstacionamento.length > 0) {
-        const descricaoItens = itensEstacionamento.map(i => i.tipo.toLowerCase()).join(', ');
-        const formulaParcelas = itensEstacionamento.map(item =>
-          `(${item.quantidade} ${item.tipo.toLowerCase()} x R$ ${item.mntDia.toFixed(2)}/dia)`
-        ).join(' + ');
-        const valorEstacionamento = itensEstacionamento.reduce((sum, item) =>
-          sum + (item.quantidade * item.mntDia * item.periodoDias), 0
+        const descricaoItens = itensEstacionamento
+          .map((i) => i.tipo.toLowerCase())
+          .join(", ");
+        const formulaParcelas = itensEstacionamento
+          .map(
+            (item) =>
+              `(${
+                item.quantidade
+              } ${item.tipo.toLowerCase()} x R$ ${item.mntDia.toFixed(2)}/dia)`
+          )
+          .join(" + ");
+        const valorEstacionamento = itensEstacionamento.reduce(
+          (sum, item) => sum + item.quantidade * item.mntDia * item.periodoDias,
+          0
         );
         const dias = itensEstacionamento[0]?.periodoDias || 0;
 
         sections.push(`MATERIAL DE ESTACIONAMENTO (${descricaoItens}):
-Memória de cálculo: [${formulaParcelas}] x ${dias} dias = R$ ${valorEstacionamento.toFixed(2)}`);
+Memória de cálculo: [${formulaParcelas}] x ${dias} dias = R$ ${valorEstacionamento.toFixed(
+          2
+        )}`);
       }
 
       if (itensAlojamento.length > 0) {
-        const descricaoItens = itensAlojamento.map(i => i.tipo.toLowerCase()).join(', ');
-        const formulaParcelas = itensAlojamento.map(item =>
-          `(${item.quantidade} ${item.tipo.toLowerCase()} x R$ ${item.mntDia.toFixed(2)}/dia)`
-        ).join(' + ');
-        const valorAlojamento = itensAlojamento.reduce((sum, item) =>
-          sum + (item.quantidade * item.mntDia * item.periodoDias), 0
+        const descricaoItens = itensAlojamento
+          .map((i) => i.tipo.toLowerCase())
+          .join(", ");
+        const formulaParcelas = itensAlojamento
+          .map(
+            (item) =>
+              `(${
+                item.quantidade
+              } ${item.tipo.toLowerCase()} x R$ ${item.mntDia.toFixed(2)}/dia)`
+          )
+          .join(" + ");
+        const valorAlojamento = itensAlojamento.reduce(
+          (sum, item) => sum + item.quantidade * item.mntDia * item.periodoDias,
+          0
         );
         const dias = itensAlojamento[0]?.periodoDias || 0;
 
         sections.push(`MATERIAL DE ALOJAMENTO (${descricaoItens}):
-Memória de cálculo: [${formulaParcelas}] x ${dias} dias = R$ ${valorAlojamento.toFixed(2)}`);
+Memória de cálculo: [${formulaParcelas}] x ${dias} dias = R$ ${valorAlojamento.toFixed(
+          2
+        )}`);
       }
 
       if (itensOutros.length > 0) {
-        const descricaoItens = itensOutros.map(i => i.tipo.toLowerCase()).join(', ');
-        const formulaParcelas = itensOutros.map(item =>
-          `(${item.quantidade} ${item.tipo} x R$ ${item.mntDia.toFixed(2)}/dia)`
-        ).join(' + ');
-        const valorOutros = itensOutros.reduce((sum, item) =>
-          sum + (item.quantidade * item.mntDia * item.periodoDias), 0
+        const descricaoItens = itensOutros
+          .map((i) => i.tipo.toLowerCase())
+          .join(", ");
+        const formulaParcelas = itensOutros
+          .map(
+            (item) =>
+              `(${item.quantidade} ${item.tipo} x R$ ${item.mntDia.toFixed(
+                2
+              )}/dia)`
+          )
+          .join(" + ");
+        const valorOutros = itensOutros.reduce(
+          (sum, item) => sum + item.quantidade * item.mntDia * item.periodoDias,
+          0
         );
         const dias = itensOutros[0]?.periodoDias || 0;
 
         sections.push(`OUTROS MATERIAIS (${descricaoItens}):
-Memória de cálculo: [${formulaParcelas}] x ${dias} dias = R$ ${valorOutros.toFixed(2)}`);
+Memória de cálculo: [${formulaParcelas}] x ${dias} dias = R$ ${valorOutros.toFixed(
+          2
+        )}`);
       }
 
-      carimboTexto = sections.join('\n\n');
-      break;
-    }
-
-    case 'FARDAMENTO': {
-      valor = material.valorFardamento;
-
-      carimboTexto = `FARDAMENTO:
-Valor conforme IRDU e necessidades específicas = R$ ${valor.toFixed(2)}`;
+      carimboTexto = sections.join("\n\n");
       break;
     }
   }
@@ -232,9 +276,13 @@ Valor conforme IRDU e necessidades específicas = R$ ${valor.toFixed(2)}`;
 /**
  * Cálculo principal CLASSE II - Nova versão com múltiplos materiais
  */
-export function calcularClasseII(params: ParametrosClasseII): ResultadoClasseII {
+export function calcularClasseII(
+  params: ParametrosClasseII,
+  unidade?: string,
+  nomeOperacao?: string
+): ResultadoClasseII {
   if (!params.materiais || params.materiais.length === 0) {
-    throw new Error('Deve haver pelo menos um material');
+    throw new Error("Deve haver pelo menos um material");
   }
 
   let valorTotal = 0;
@@ -246,10 +294,19 @@ export function calcularClasseII(params: ParametrosClasseII): ResultadoClasseII 
     secoesMateriais.push(carimboTexto);
   }
 
-  // Montar carimbo completo
-  const carimboCompleto = `${secoesMateriais.join('\n\n')}
+  const totalFormatado = `R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const unidadeTexto = unidade || "OM não identificada";
+  const operacaoTexto = nomeOperacao || "operação";
 
-Total: R$ ${valorTotal.toFixed(2)}`;
+  // Montar carimbo no formato padrão
+  const textoPadrao = `Aquisição de insumos para recuperação e reparação dos equipamentos empregados durante a ${operacaoTexto}.`;
+
+  const carimboCompleto = `33.90.30 e 33.90.39 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+Memória de Cálculo:
+
+${secoesMateriais.join("\n\n")}
+
+Total: ${totalFormatado}`;
 
   return {
     valorTotal: Number(valorTotal.toFixed(2)),

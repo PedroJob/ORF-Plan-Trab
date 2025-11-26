@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { PreviewCalculo } from "../PreviewCalculo";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
+import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
 
 interface ParametrosClasseX {
   quantidade: number;
@@ -13,9 +14,16 @@ interface ParametrosClasseX {
 interface FormularioClasseXProps {
   value: ParametrosClasseX | null;
   onChange: (params: HandleParametrosChange) => void;
+  operacao: OperacaoWithEfetivo;
+  userOm: UserOM | null;
 }
 
-export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
+export function FormularioClasseX({
+  value,
+  onChange,
+  operacao,
+  userOm,
+}: FormularioClasseXProps) {
   const [params, setParams] = useState<ParametrosClasseX>(
     value || {
       quantidade: 0,
@@ -25,7 +33,8 @@ export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
   );
 
   const [valorTotal, setValorTotal] = useState<number | null>(null);
-  const [detalhes, setDetalhes] = useState<any>(null);
+  const [carimbo, setCarimbo] = useState<string>("");
+  const [carimboEditadoManualmente, setCarimboEditadoManualmente] = useState(false);
 
   useEffect(() => {
     calcular();
@@ -34,26 +43,53 @@ export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
   const calcular = () => {
     const { quantidade, valorUnitario, descricaoDetalhada } = params;
 
-    if (quantidade <= 0 || valorUnitario <= 0) {
+    if (
+      !quantidade ||
+      quantidade <= 0 ||
+      !valorUnitario ||
+      valorUnitario <= 0
+    ) {
       setValorTotal(null);
-      setDetalhes(null);
+      setCarimbo("");
       return;
     }
 
     const total = quantidade * valorUnitario;
     const totalFinal = Number(total.toFixed(2));
+    const totalFormatado = `R$ ${totalFinal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const unidadeTexto = userOm?.sigla || "OM não identificada";
+    const operacaoTexto = operacao.nome || "operação";
+    const textoPadrao = `Aquisição de material não classificado para emprego durante a ${operacaoTexto}.`;
+
+    // Gerar memória de cálculo como string
+    const memoriaCalculo = `33.90.30 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+Memória de Cálculo:
+
+Descrição: ${descricaoDetalhada || "Não especificado"}
+
+→ ${quantidade} un × R$ ${valorUnitario.toFixed(2)} = ${totalFormatado}
+
+Total: ${totalFormatado}`;
 
     setValorTotal(totalFinal);
-    setDetalhes({
-      quantidade,
-      valorUnitario,
-      descricaoDetalhada: descricaoDetalhada || "Não especificado",
-    });
-    onChange({ params, valor: totalFinal, descricao: detalhes });
+    setCarimbo(memoriaCalculo);
+    setCarimboEditadoManualmente(false);
+    onChange({ params, valor: totalFinal, descricao: memoriaCalculo });
   };
 
   const handleChange = (field: keyof ParametrosClasseX, value: any) => {
     setParams((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCarimboChange = (novoCarimbo: string) => {
+    setCarimbo(novoCarimbo);
+    setCarimboEditadoManualmente(true);
+    onChange({ params, valor: valorTotal || 0, descricao: novoCarimbo });
+  };
+
+  const handleResetCarimbo = () => {
+    setCarimboEditadoManualmente(false);
+    calcular();
   };
 
   return (
@@ -128,13 +164,36 @@ export function FormularioClasseX({ value, onChange }: FormularioClasseXProps) {
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-        <p className="text-sm text-blue-800">
-          <strong>Fórmula:</strong> Quantidade × Valor Unitário
+      <PreviewCalculo valorTotal={valorTotal} />
+
+      {/* Carimbo editável */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">
+            Carimbo
+          </label>
+          {carimboEditadoManualmente && (
+            <button
+              type="button"
+              onClick={handleResetCarimbo}
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              Restaurar automático
+            </button>
+          )}
+        </div>
+
+        <textarea
+          value={carimbo || ""}
+          onChange={(e) => handleCarimboChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
+          placeholder="O carimbo será gerado automaticamente..."
+        />
+
+        <p className="text-xs text-gray-500">
+          Este texto será usado como justificativa da despesa. Edite se necessário.
         </p>
       </div>
-
-      <PreviewCalculo valorTotal={valorTotal} carimbo={detalhes} />
     </div>
   );
 }

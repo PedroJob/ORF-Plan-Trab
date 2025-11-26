@@ -13,18 +13,17 @@ interface Aprovacao {
     postoGraduacao: string;
     nomeCompleto: string;
     nomeGuerra: string | null;
+    role: string;
+  };
+  omNivel?: {
+    nome: string;
+    sigla: string;
   };
 }
 
 interface HistoricoAprovacoesProps {
   planoId: string;
 }
-
-const NOMES_NIVEIS: Record<number, string> = {
-  1: "Comandante da OM",
-  2: "Comandante da Brigada",
-  3: "Comandante do CMA",
-};
 
 export function HistoricoAprovacoes({ planoId }: HistoricoAprovacoesProps) {
   const [aprovacoes, setAprovacoes] = useState<Aprovacao[]>([]);
@@ -59,6 +58,16 @@ export function HistoricoAprovacoes({ planoId }: HistoricoAprovacoesProps) {
     });
   };
 
+  const getRoleLabel = (role: string) => {
+    const labels: Record<string, string> = {
+      S4: "S4",
+      COMANDANTE: "Comandante",
+      INTEGRANTE: "Integrante",
+      SUPER_ADMIN: "Super Admin",
+    };
+    return labels[role] || role;
+  };
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -80,6 +89,9 @@ export function HistoricoAprovacoes({ planoId }: HistoricoAprovacoesProps) {
         </h3>
         <p className="text-sm text-gray-500 text-center py-8">
           Nenhuma aprovação ou reprovação registrada ainda.
+        </p>
+        <p className="text-xs text-gray-400 text-center">
+          O S4 da OM será responsável por aprovar este plano.
         </p>
       </div>
     );
@@ -126,13 +138,18 @@ export function HistoricoAprovacoes({ planoId }: HistoricoAprovacoesProps) {
                     >
                       {aprovacao.acao === "APROVADO" ? "Aprovado" : "Reprovado"}
                     </span>
-                    <span className="text-xs text-gray-500">
-                      • Nível {aprovacao.nivelHierarquico}
+                    <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">
+                      {getRoleLabel(aprovacao.aprovador.role)}
                     </span>
                   </div>
 
                   <p className="text-sm text-gray-700 mt-1">
-                    {NOMES_NIVEIS[aprovacao.nivelHierarquico] || `Nível ${aprovacao.nivelHierarquico}`}
+                    S4 da OM
+                    {aprovacao.omNivel && (
+                      <span className="text-gray-500">
+                        {" "}({aprovacao.omNivel.sigla})
+                      </span>
+                    )}
                   </p>
 
                   <p className="text-sm text-gray-600 mt-2">

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PreviewCalculo } from "../PreviewCalculo";
 import { Plus, X } from "lucide-react";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
+import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
 
 interface MaterialConstrucao {
   descricao: string;
@@ -18,11 +19,15 @@ interface ParametrosClasseIV {
 interface FormularioClasseIVProps {
   value: ParametrosClasseIV | null;
   onChange: (params: HandleParametrosChange) => void;
+  operacao: OperacaoWithEfetivo;
+  userOm: UserOM | null;
 }
 
 export function FormularioClasseIV({
   value,
   onChange,
+  operacao,
+  userOm,
 }: FormularioClasseIVProps) {
   const [params, setParams] = useState<ParametrosClasseIV>(
     value || {
@@ -32,6 +37,8 @@ export function FormularioClasseIV({
 
   const [valorTotal, setValorTotal] = useState<number | null>(null);
   const [detalhes, setDetalhes] = useState<any>(null);
+  const [carimbo, setCarimbo] = useState<string>("");
+  const [carimboEditadoManualmente, setCarimboEditadoManualmente] = useState(false);
 
   useEffect(() => {
     calcular();
@@ -43,6 +50,7 @@ export function FormularioClasseIV({
     if (materiais.length === 0) {
       setValorTotal(null);
       setDetalhes(null);
+      setCarimbo("");
       return;
     }
 
@@ -53,6 +61,7 @@ export function FormularioClasseIV({
     if (materiaisValidos.length === 0) {
       setValorTotal(null);
       setDetalhes(null);
+      setCarimbo("");
       return;
     }
 
@@ -65,13 +74,46 @@ export function FormularioClasseIV({
 
     const total = itensDetalhados.reduce((sum, item) => sum + item.subtotal, 0);
     const totalFinal = Number(total.toFixed(2));
+    const totalFormatado = `R$ ${totalFinal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    // Gerar memória de cálculo como string
+    const memoriaCalculo = itensDetalhados
+      .map(
+        (item) =>
+          `→ ${item.descricao}: ${item.quantidade} x R$ ${item.valorUnitario.toFixed(2)} = R$ ${item.subtotal.toFixed(2)}`
+      )
+      .join("\n");
+
+    const unidadeTexto = userOm?.sigla || "OM não identificada";
+    const operacaoTexto = operacao.nome || "operação";
+    const textoPadrao = `Aquisição de materiais de construção e engenharia para emprego no contexto da ${operacaoTexto}.`;
+
+    const carimboPadrao = `33.90.30 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+Memória de Cálculo:
+
+${memoriaCalculo}
+
+Total: ${totalFormatado}`;
 
     setValorTotal(totalFinal);
     setDetalhes({
       numeroItens: itensDetalhados.length,
       itens: itensDetalhados,
     });
-    onChange({ params, valor: totalFinal, descricao: detalhes });
+    setCarimbo(carimboPadrao);
+    setCarimboEditadoManualmente(false);
+    onChange({ params, valor: totalFinal, descricao: carimboPadrao });
+  };
+
+  const handleCarimboChange = (novoCarimbo: string) => {
+    setCarimbo(novoCarimbo);
+    setCarimboEditadoManualmente(true);
+    onChange({ params, valor: valorTotal || 0, descricao: novoCarimbo });
+  };
+
+  const handleResetCarimbo = () => {
+    setCarimboEditadoManualmente(false);
+    calcular();
   };
 
   const handleAddMaterial = () => {
@@ -220,14 +262,36 @@ export function FormularioClasseIV({
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-        <p className="text-sm text-blue-800">
-          <strong>Fórmula:</strong> Soma de (Quantidade × Valor Unitário) de
-          todos os materiais
+      <PreviewCalculo valorTotal={valorTotal} />
+
+      {/* Carimbo editável */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">
+            Carimbo
+          </label>
+          {carimboEditadoManualmente && (
+            <button
+              type="button"
+              onClick={handleResetCarimbo}
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              Restaurar automático
+            </button>
+          )}
+        </div>
+
+        <textarea
+          value={carimbo || ""}
+          onChange={(e) => handleCarimboChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
+          placeholder="O carimbo será gerado automaticamente..."
+        />
+
+        <p className="text-xs text-gray-500">
+          Este texto será usado como justificativa da despesa. Edite se necessário.
         </p>
       </div>
-
-      <PreviewCalculo valorTotal={valorTotal} carimbo={detalhes} />
     </div>
   );
 }

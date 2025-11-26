@@ -36,11 +36,13 @@ export async function GET(request: NextRequest) {
       whereClause.operacaoId = operacaoId;
     }
 
-    // Filtrar por OM se não for role que vê tudo
-    if (!['CMT_BRIGADA', 'CMT_CMA', 'SUPER_ADMIN'].includes(user.role)) {
-      whereClause.operacao = {
-        omId: user.omId,
-      };
+    // Filtrar por OM se não for role que vê tudo (COMANDANTE e SUPER_ADMIN veem todos)
+    if (!['COMANDANTE', 'SUPER_ADMIN'].includes(user.role)) {
+      // Usuário vê planos da sua OM ou de operações criadas pela sua OM
+      whereClause.OR = [
+        { omId: user.omId }, // Planos da OM do usuário
+        { operacao: { omId: user.omId } }, // Planos de operações criadas pela OM do usuário
+      ];
     }
 
     const planos = await prisma.planoTrabalho.findMany({
@@ -56,6 +58,25 @@ export async function GET(request: NextRequest) {
                 tipo: true,
               },
             },
+            omsParticipantes: {
+              include: {
+                om: {
+                  select: {
+                    id: true,
+                    nome: true,
+                    sigla: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        om: {
+          select: {
+            id: true,
+            nome: true,
+            sigla: true,
+            tipo: true,
           },
         },
         responsavel: {
@@ -126,6 +147,9 @@ export async function POST(request: NextRequest) {
     // Verificar se operação existe
     const operacao = await prisma.operacao.findUnique({
       where: { id: data.operacaoId },
+      include: {
+        omsParticipantes: true,
+      },
     });
 
     if (!operacao) {
@@ -135,7 +159,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obter próxima versão
+    // Verificar se a OM do usuário participa da operação (se não for SUPER_ADMIN)
+    if (user.role !== 'SUPER_ADMIN') {
+      const omParticipates = operacao.omsParticipantes.some(
+        (p) => p.omId === user.omId
+      );
+
+      if (!omParticipates) {
+        return NextResponse.json(
+          { error: 'Sua OM não participa desta operação' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Verificar se já existe plano para esta OM nesta operação
+    const existingPlano = await prisma.planoTrabalho.findUnique({
+      where: {
+        operacaoId_omId: {
+          operacaoId: data.operacaoId,
+          omId: user.omId,
+        },
+      },
+    });
+
+    if (existingPlano) {
+      return NextResponse.json(
+        { error: 'Já existe um plano de trabalho da sua OM para esta operação' },
+        { status: 400 }
+      );
+    }
+
+    // Obter próxima versão (global para a operação, para histórico)
     const lastVersion = await prisma.planoTrabalho.findFirst({
       where: { operacaoId: data.operacaoId },
       orderBy: { versao: 'desc' },
@@ -144,12 +199,13 @@ export async function POST(request: NextRequest) {
 
     const nextVersion = lastVersion ? lastVersion.versao + 1 : 1;
 
-    // Criar plano
+    // Criar plano vinculado à OM do usuário
     const plano = await prisma.planoTrabalho.create({
       data: {
         titulo: data.titulo,
         versao: nextVersion,
         operacaoId: data.operacaoId,
+        omId: user.omId,
         responsavelId: user.id,
         prioridade: data.prioridade || Prioridade.MEDIA,
         status: StatusPlano.RASCUNHO,
@@ -158,8 +214,14 @@ export async function POST(request: NextRequest) {
         operacao: {
           include: {
             om: true,
+            omsParticipantes: {
+              include: {
+                om: true,
+              },
+            },
           },
         },
+        om: true,
         responsavel: {
           select: {
             id: true,

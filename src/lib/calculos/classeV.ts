@@ -1,236 +1,218 @@
 /**
- * CLASSE V — MUNIÇÕES E ARMAMENTO (GND 3 e 4)
+ * CLASSE V — MANUTENÇÃO DE ARMAMENTO
  *
- * Dois tipos de cálculo:
- * 1. Munições: quantidade × preço unitário
- * 2. Armamento: 8% do MEM anual para manutenção
+ * Cálculo baseado no custo de manutenção por dia de operação militar
+ * Fórmula: quantidade × custo_mnt_dia × dias_operacao
+ *
+ * Os valores de custo diário são derivados de:
+ * - 8% do valor MEM por ano
+ * - Dividido por 365 dias e arredondado
  */
 
-export interface ItemMunicao {
-  tipo: string; // Descrição da munição (ex: "7,62mm", "5,56mm", "Cal 12")
-  quantidade: number;
-  valorUnitario: number;
+// Tipos de armamento disponíveis
+export type TipoArmamento =
+  | "FUZIL_556_IA2_IMBEL"
+  | "FUZIL_762_MEDIA"
+  | "PISTOLA_9MM_MEDIA"
+  | "METRALHADORA_FN_MINIMI_556"
+  | "METRALHADORA_FN_MINIMI_762"
+  | "OBUSEIRO"
+  | "OVN"
+  | "FALCON_4GS";
+
+export interface ArmamentoInfo {
+  nome: string;
+  categoria: "ARMT_L" | "ARMT_P" | "IODCT" | "DQBRN";
+  valorMEM: number; // Valor do MEM (Ano Referência)
+  custoMntDiaBase: number; // Custeio-Mnt/Dia Base: 8% do MEM/Ano
+  custoMntDiaOpMil: number; // Cálculo-Mnt/Dia Op Mil (valor aproximado)
 }
 
+// Tabela de armamentos com valores da tabela de referência
+export const ARMAMENTOS: Record<TipoArmamento, ArmamentoInfo> = {
+  FUZIL_556_IA2_IMBEL: {
+    nome: "Fuzil 5,56 mm IA2 IMBEL",
+    categoria: "ARMT_L",
+    valorMEM: 6300.0,
+    custoMntDiaBase: 1.38,
+    custoMntDiaOpMil: 1.4,
+  },
+  FUZIL_762_MEDIA: {
+    nome: "Fuzil 7,62 mm (média)",
+    categoria: "ARMT_L",
+    valorMEM: 6709.87,
+    custoMntDiaBase: 1.47,
+    custoMntDiaOpMil: 1.5,
+  },
+  PISTOLA_9MM_MEDIA: {
+    nome: "Pistola 9 mm (média)",
+    categoria: "ARMT_L",
+    valorMEM: 1774.7,
+    custoMntDiaBase: 0.39,
+    custoMntDiaOpMil: 0.4,
+  },
+  METRALHADORA_FN_MINIMI_556: {
+    nome: "Metralhadora FN MINIMI 5,56X45mm",
+    categoria: "ARMT_L",
+    valorMEM: 48000.0,
+    custoMntDiaBase: 10.52,
+    custoMntDiaOpMil: 10.6,
+  },
+  METRALHADORA_FN_MINIMI_762: {
+    nome: "Metralhadora FN MINIMI 7,62X51mm",
+    categoria: "ARMT_L",
+    valorMEM: 50000.0,
+    custoMntDiaBase: 10.96,
+    custoMntDiaOpMil: 11.0,
+  },
+  OBUSEIRO: {
+    nome: "Obuseiro",
+    categoria: "ARMT_P",
+    valorMEM: 800000.0,
+    custoMntDiaBase: 175.34,
+    custoMntDiaOpMil: 175.0,
+  },
+  OVN: {
+    nome: "OVN",
+    categoria: "IODCT",
+    valorMEM: 43195.0,
+    custoMntDiaBase: 9.46,
+    custoMntDiaOpMil: 9.5,
+  },
+  FALCON_4GS: {
+    nome: "Falcon 4GS",
+    categoria: "DQBRN",
+    valorMEM: 3300000.0,
+    custoMntDiaBase: 723.29,
+    custoMntDiaOpMil: 723.3,
+  },
+};
+
 export interface ItemArmamento {
-  tipo: string; // Descrição do armamento (ex: "Fuzil IMBEL", "Pistola Taurus")
+  tipoArmamento: TipoArmamento;
   quantidade: number;
-  valorMEM: number; // Valor do Material Empregado Militar por unidade
+  diasUso: number;
+  custoMntDiaCustomizado?: number; // Custo customizado por dia (opcional)
 }
 
 export interface ParametrosClasseV {
-  tipoCalculo: 'MUNICOES' | 'ARMAMENTO' | 'AMBOS';
-
-  // Para Munições
-  municoes?: ItemMunicao[];
-
-  // Para Armamento
-  armamentos?: ItemArmamento[];
+  armamentos: ItemArmamento[];
 }
 
 export interface ResultadoClasseV {
   valorTotal: number;
-  detalhamento: any;
+  detalhamento: string;
 }
 
 /**
- * Taxa de manutenção de armamento
+ * Calcula o custo de manutenção para um item de armamento
  */
-const TAXA_MANUTENCAO_ARMAMENTO = 0.08; // 8% do MEM anual
-
-/**
- * Cálculo para Munições
- * Fórmula: custo = Σ(quantidade × valor_unitario)
- */
-export function calcularMunicoes(municoes: ItemMunicao[]): number {
-  if (!municoes || municoes.length === 0) {
-    return 0;
-  }
-
-  let total = 0;
-
-  for (const item of municoes) {
-    if (item.quantidade <= 0 || item.valorUnitario < 0) {
-      throw new Error(`Valores inválidos para a munição "${item.tipo}"`);
-    }
-
-    total += item.quantidade * item.valorUnitario;
-  }
-
-  return total;
+function calcularCustoItem(item: ItemArmamento): number {
+  const armamento = ARMAMENTOS[item.tipoArmamento];
+  const custoDia = item.custoMntDiaCustomizado ?? armamento.custoMntDiaOpMil;
+  return item.quantidade * custoDia * item.diasUso;
 }
 
 /**
- * Cálculo para Armamento
- * Fórmula: custo = Σ(quantidade × valorMEM) × 8%
+ * Obtém o custo diário efetivo de um item (customizado ou padrão)
  */
-export function calcularArmamento(armamentos: ItemArmamento[]): number {
-  if (!armamentos || armamentos.length === 0) {
-    return 0;
-  }
+export function getCustoDiaEfetivo(item: ItemArmamento): number {
+  const armamento = ARMAMENTOS[item.tipoArmamento];
+  return item.custoMntDiaCustomizado ?? armamento.custoMntDiaOpMil;
+}
 
-  let total = 0;
+/**
+ * Gera o detalhamento/memória de cálculo
+ */
+function gerarDetalhamento(
+  armamentos: ItemArmamento[],
+  valorTotal: number,
+  unidade?: string,
+  nomeOperacao?: string
+): string {
+  const totalFormatado = `R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const unidadeTexto = unidade || "OM não identificada";
+  const operacaoTexto = nomeOperacao || "operação";
+  const textoPadrao = `Aquisição de insumos para recuperação e reparação de armamentos empregados durante a ${operacaoTexto}.`;
+
+  let memoriaCalculo = "";
 
   for (const item of armamentos) {
-    if (item.quantidade <= 0 || item.valorMEM < 0) {
-      throw new Error(`Valores inválidos para o armamento "${item.tipo}"`);
-    }
+    const armamento = ARMAMENTOS[item.tipoArmamento];
+    const custoDia = getCustoDiaEfetivo(item);
+    const custoItem = calcularCustoItem(item);
+    const isCustomizado = item.custoMntDiaCustomizado !== undefined;
 
-    const valorTotalItem = item.quantidade * item.valorMEM;
-    const custoManutencao = valorTotalItem * TAXA_MANUTENCAO_ARMAMENTO;
-    total += custoManutencao;
+    memoriaCalculo += `→ ${armamento.nome}\n`;
+    memoriaCalculo += `  ${item.quantidade} un × R$ ${custoDia.toFixed(2)}/dia${isCustomizado ? " (customizado)" : ""} × ${item.diasUso} dias\n`;
+    memoriaCalculo += `  Subtotal: R$ ${custoItem.toFixed(2)}\n\n`;
   }
 
-  return total;
+  return `33.90.30 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+Memória de Cálculo:
+
+${memoriaCalculo}
+Total: ${totalFormatado}`;
 }
 
 /**
  * Cálculo principal CLASSE V
  */
-export function calcularClasseV(params: ParametrosClasseV): ResultadoClasseV {
-  let valorTotal = 0;
-  let detalhamento: any = {
-    tipoCalculo: params.tipoCalculo,
-  };
-
-  switch (params.tipoCalculo) {
-    case 'MUNICOES':
-      if (!params.municoes || params.municoes.length === 0) {
-        throw new Error('Deve haver pelo menos uma munição');
-      }
-
-      const custoMunicoes = calcularMunicoes(params.municoes);
-      valorTotal = custoMunicoes;
-
-      detalhamento = {
-        ...detalhamento,
-        municoes: params.municoes.map(item => ({
-          ...item,
-          subtotal: item.quantidade * item.valorUnitario,
-          formula: `${item.quantidade} × R$ ${item.valorUnitario.toFixed(2)}`,
-        })),
-      };
-      break;
-
-    case 'ARMAMENTO':
-      if (!params.armamentos || params.armamentos.length === 0) {
-        throw new Error('Deve haver pelo menos um armamento');
-      }
-
-      const custoArmamento = calcularArmamento(params.armamentos);
-      valorTotal = custoArmamento;
-
-      detalhamento = {
-        ...detalhamento,
-        taxaManutencao: TAXA_MANUTENCAO_ARMAMENTO,
-        armamentos: params.armamentos.map(item => {
-          const valorTotalItem = item.quantidade * item.valorMEM;
-          const custoManutencao = valorTotalItem * TAXA_MANUTENCAO_ARMAMENTO;
-          return {
-            ...item,
-            valorTotalMEM: valorTotalItem,
-            custoManutencao: custoManutencao,
-            formula: `(${item.quantidade} × R$ ${item.valorMEM.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) × ${(TAXA_MANUTENCAO_ARMAMENTO * 100).toFixed(0)}%`,
-          };
-        })
-      }
-      break;
-
-    case 'AMBOS':
-      if ((!params.municoes || params.municoes.length === 0) &&
-          (!params.armamentos || params.armamentos.length === 0)) {
-        throw new Error('Deve haver pelo menos uma munição ou um armamento');
-      }
-
-      let custoMunicoesAmbos = 0;
-      let custoArmamentoAmbos = 0;
-
-      if (params.municoes && params.municoes.length > 0) {
-        custoMunicoesAmbos = calcularMunicoes(params.municoes);
-      }
-
-      if (params.armamentos && params.armamentos.length > 0) {
-        custoArmamentoAmbos = calcularArmamento(params.armamentos);
-      }
-
-      valorTotal = custoMunicoesAmbos + custoArmamentoAmbos;
-
-      detalhamento = {
-        ...detalhamento,
-        custoMunicoes: custoMunicoesAmbos,
-        custoArmamento: custoArmamentoAmbos,
-        taxaManutencao: TAXA_MANUTENCAO_ARMAMENTO,
-      };
-
-      if (params.municoes && params.municoes.length > 0) {
-        detalhamento.municoes = params.municoes.map(item => ({
-          ...item,
-          subtotal: item.quantidade * item.valorUnitario,
-          formula: `${item.quantidade} × R$ ${item.valorUnitario.toFixed(2)}`,
-        }));
-      }
-
-      if (params.armamentos && params.armamentos.length > 0) {
-        detalhamento.armamentos = params.armamentos.map(item => {
-          const valorTotalItem = item.quantidade * item.valorMEM;
-          const custoManutencao = valorTotalItem * TAXA_MANUTENCAO_ARMAMENTO;
-          return {
-            ...item,
-            valorTotalMEM: valorTotalItem,
-            custoManutencao: custoManutencao,
-            formula: `(${item.quantidade} × R$ ${item.valorMEM.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) × ${(TAXA_MANUTENCAO_ARMAMENTO * 100).toFixed(0)}%`,
-          };
-        });
-      }
-      break;
-
-    default:
-      throw new Error('Tipo de cálculo inválido');
+export function calcularClasseV(
+  params: ParametrosClasseV,
+  unidade?: string,
+  nomeOperacao?: string
+): ResultadoClasseV {
+  if (!params.armamentos || params.armamentos.length === 0) {
+    throw new Error("Deve haver pelo menos um armamento");
   }
 
+  let valorTotal = 0;
+
+  for (const item of params.armamentos) {
+    if (item.quantidade <= 0) {
+      throw new Error(
+        `Quantidade inválida para ${ARMAMENTOS[item.tipoArmamento].nome}`
+      );
+    }
+    if (item.diasUso <= 0) {
+      throw new Error(
+        `Dias de uso inválido para ${ARMAMENTOS[item.tipoArmamento].nome}`
+      );
+    }
+
+    valorTotal += calcularCustoItem(item);
+  }
+
+  const valorTotalFinal = Number(valorTotal.toFixed(2));
+  const detalhamento = gerarDetalhamento(params.armamentos, valorTotalFinal, unidade, nomeOperacao);
+
   return {
-    valorTotal: Number(valorTotal.toFixed(2)),
+    valorTotal: valorTotalFinal,
     detalhamento,
   };
 }
 
 /**
- * Valores de referência para munições (exemplos)
+ * Lista os armamentos por categoria
  */
-export const VALORES_REFERENCIA_MUNICOES = {
-  // Munição de fuzil/carabina
-  '7.62MM': 3.50,
-  '5.56MM': 2.80,
-
-  // Munição de pistola
-  '9MM': 1.50,
-  '.40': 2.00,
-  '.45': 2.50,
-
-  // Munição de espingarda
-  'CAL_12': 4.00,
-
-  // Munição especial
-  'GRANADA_40MM': 150.00,
-  'FUMIGENO': 80.00,
-};
+export function listarArmamentosPorCategoria(
+  categoria: ArmamentoInfo["categoria"]
+): { tipo: TipoArmamento; info: ArmamentoInfo }[] {
+  return Object.entries(ARMAMENTOS)
+    .filter(([_, info]) => info.categoria === categoria)
+    .map(([tipo, info]) => ({ tipo: tipo as TipoArmamento, info }));
+}
 
 /**
- * Valores de referência MEM para armamentos (exemplos em R$)
+ * Lista todos os armamentos disponíveis
  */
-export const VALORES_REFERENCIA_MEM = {
-  // Fuzis e carabinas
-  FUZIL_IMBEL_762: 8000.00,
-  CARABINA_556: 7000.00,
-
-  // Pistolas
-  PISTOLA_TAURUS_9MM: 3000.00,
-  PISTOLA_40: 3500.00,
-
-  // Espingardas
-  ESPINGARDA_CAL12: 2500.00,
-
-  // Armamento especial
-  METRALHADORA_762: 25000.00,
-  LANCA_GRANADAS: 15000.00,
-};
+export function listarTodosArmamentos(): {
+  tipo: TipoArmamento;
+  info: ArmamentoInfo;
+}[] {
+  return Object.entries(ARMAMENTOS).map(([tipo, info]) => ({
+    tipo: tipo as TipoArmamento,
+    info,
+  }));
+}

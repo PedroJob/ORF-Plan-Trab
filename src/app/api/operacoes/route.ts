@@ -5,6 +5,11 @@ import { canCreateOperacao, canViewAllPlanos } from '@/lib/permissions';
 import { z } from 'zod';
 import { StatusPlano, Prioridade, TipoEvento } from '@prisma/client';
 
+const omParticipanteSchema = z.object({
+  omId: z.string().min(1, 'ID da OM é obrigatório'),
+  valorLimite: z.number().positive('Valor limite deve ser positivo'),
+});
+
 const createOperacaoSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
   efetivoMil: z.number().int().positive('Efetivo deve ser positivo'),
@@ -16,6 +21,8 @@ const createOperacaoSchema = z.object({
   motivacao: z.string().optional(),
   consequenciaNaoAtendimento: z.string().optional(),
   observacoes: z.string().optional(),
+  valorLimiteTotal: z.number().positive('Valor limite total deve ser positivo').optional(),
+  omsParticipantes: z.array(omParticipanteSchema).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -35,9 +42,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Filtrar operações baseado na hierarquia
+    // Usuário vê operações que criou OU que sua OM participa
     const whereClause = canViewAllPlanos(user.role)
-      ? {} // Ver todas
-      : { omId: user.omId }; // Ver apenas da sua OM
+      ? {} // SUPER_ADMIN e COMANDANTE veem todas
+      : {
+          OR: [
+            { omId: user.omId }, // Criou a operação
+            { omsParticipantes: { some: { omId: user.omId } } }, // Participa da operação
+          ],
+        };
 
     const operacoes = await prisma.operacao.findMany({
       where: whereClause,
@@ -50,11 +63,24 @@ export async function GET(request: NextRequest) {
             tipo: true,
           },
         },
+        omsParticipantes: {
+          include: {
+            om: {
+              select: {
+                id: true,
+                nome: true,
+                sigla: true,
+                tipo: true,
+              },
+            },
+          },
+        },
         planosTrabalho: {
           select: {
             id: true,
             titulo: true,
             status: true,
+            omId: true,
           },
         },
       },
@@ -101,6 +127,23 @@ export async function POST(request: NextRequest) {
 
     const data = validation.data;
 
+    // Validar que soma dos valores das OMs não excede o limite total
+    if (data.valorLimiteTotal && data.omsParticipantes && data.omsParticipantes.length > 0) {
+      const somaValores = data.omsParticipantes.reduce((acc, om) => acc + om.valorLimite, 0);
+      if (somaValores > data.valorLimiteTotal) {
+        return NextResponse.json(
+          {
+            error: 'Soma dos valores das OMs participantes excede o valor limite total',
+            details: {
+              valorLimiteTotal: data.valorLimiteTotal,
+              somaValoresOMs: somaValores,
+            },
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Criar operação
     const operacao = await prisma.operacao.create({
       data: {
@@ -116,11 +159,23 @@ export async function POST(request: NextRequest) {
         consequenciaNaoAtendimento: data.consequenciaNaoAtendimento,
         observacoes: data.observacoes,
         omId: user.omId,
+        valorLimiteTotal: data.valorLimiteTotal,
       },
       include: {
         om: true,
       },
     });
+
+    // Criar OMs participantes se fornecidas
+    if (data.omsParticipantes && data.omsParticipantes.length > 0) {
+      await prisma.operacaoOM.createMany({
+        data: data.omsParticipantes.map((omPart) => ({
+          operacaoId: operacao.id,
+          omId: omPart.omId,
+          valorLimite: omPart.valorLimite,
+        })),
+      });
+    }
 
     // Log de auditoria
     await prisma.auditoriaLog.create({
@@ -137,7 +192,7 @@ export async function POST(request: NextRequest) {
           },
         },
       },
-    });3
+    });
 
     return NextResponse.json(operacao, { status: 201 });
   } catch (error) {

@@ -32,11 +32,9 @@ interface OM {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  INTEGRANTE_OM: 'Integrante OM',
-  CMT_OM: 'Comandante OM',
-  CMT_BRIGADA: 'Comandante Brigada',
-  INTEGRANTE_CMA: 'Integrante CMA',
-  CMT_CMA: 'Comandante CMA',
+  COMANDANTE: 'Comandante',
+  S4: 'S4',
+  INTEGRANTE: 'Integrante',
   SUPER_ADMIN: 'Super Admin',
 };
 
@@ -56,7 +54,7 @@ export default function UsuariosPage() {
     nomeGuerra: '',
     postoGraduacao: '',
     telefone: '',
-    role: 'INTEGRANTE_OM',
+    role: 'INTEGRANTE',
     omId: '',
     senha: '',
   });
@@ -135,7 +133,7 @@ export default function UsuariosPage() {
         nomeGuerra: '',
         postoGraduacao: '',
         telefone: '',
-        role: 'INTEGRANTE_OM',
+        role: 'INTEGRANTE',
         omId: '',
         senha: '',
       });

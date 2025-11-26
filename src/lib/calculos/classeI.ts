@@ -90,30 +90,23 @@ export function calcularValorOperacao(
 }
 
 export function gerarCarimboCompleto(params: {
-  destinacao: string;
-  descricaoOperacao: string;
-  nomeOperacao?: string;
+  unidade: string;
+  nomeOperacao: string;
+  efetivo: number;
   resultado: ResultadoOperacao;
   tipoRefeicao: "QS" | "QR";
 }): string {
-  const {
-    destinacao,
-    descricaoOperacao,
-    nomeOperacao,
-    resultado,
-    tipoRefeicao,
-  } = params;
+  const { unidade, nomeOperacao, efetivo, resultado, tipoRefeicao } = params;
 
-  const contexto = nomeOperacao
-    ? `${descricaoOperacao} no contexto da ${nomeOperacao}.`
-    : `${descricaoOperacao}.`;
+  const tipoTexto = tipoRefeicao === "QR" ? "QR ETAPA e QR para refeições intermediárias" : "QS para refeições intermediárias";
+  const textoPadrao = `Aquisição de gêneros alimentícios (${tipoTexto}) destinados a ${efetivo} militares no contexto da ${nomeOperacao}.`;
 
   const total = resultado.total;
+  const totalFormatado = `R$ ${total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  let carimbo = `${destinacao} - ${contexto}\n`;
-  carimbo += `- Memória de Cálculo ${tipoRefeicao}:\n\n`;
-  carimbo += resultado.memoriaCalculo;
-  carimbo += `\nTotal: R$ ${total.toFixed(2).replace(".", ",")}`;
+  return `33.90.30 – Destinado ao ${unidade}. ${textoPadrao}
+Memória de Cálculo ${tipoRefeicao}:
 
-  return carimbo;
+${resultado.memoriaCalculo}
+Total: ${totalFormatado}`;
 }

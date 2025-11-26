@@ -1,12 +1,10 @@
-import { Role, TipoOM } from "@prisma/client";
+import { Role } from "@prisma/client";
 
 export function canCreateOperacao(role: Role): boolean {
   const allowedRoles: Role[] = [
-    Role.INTEGRANTE_OM,
-    Role.INTEGRANTE_CMA,
-    Role.CMT_OM,
-    Role.CMT_BRIGADA,
-    Role.CMT_CMA,
+    Role.INTEGRANTE,
+    Role.S4,
+    Role.COMANDANTE,
     Role.SUPER_ADMIN,
   ];
   return allowedRoles.includes(role);
@@ -14,104 +12,150 @@ export function canCreateOperacao(role: Role): boolean {
 
 export function canCreatePlanoTrabalho(role: Role): boolean {
   const allowedRoles: Role[] = [
-    Role.INTEGRANTE_OM,
-    Role.CMT_OM,
-    Role.CMT_BRIGADA,
-    Role.INTEGRANTE_CMA,
-    Role.CMT_CMA,
+    Role.INTEGRANTE,
+    Role.S4,
+    Role.COMANDANTE,
     Role.SUPER_ADMIN,
   ];
   return allowedRoles.includes(role);
 }
 
 export function canApprove(role: Role): boolean {
-  const allowedRoles: Role[] = [
-    Role.CMT_OM,
-    Role.CMT_BRIGADA,
-    Role.CMT_CMA,
-    Role.SUPER_ADMIN,
-  ];
+  // Apenas S4 e SUPER_ADMIN podem aprovar (COMANDANTE NÃO aprova)
+  const allowedRoles: Role[] = [Role.S4, Role.SUPER_ADMIN];
   return allowedRoles.includes(role);
 }
 
 export function canViewAllPlanos(role: Role): boolean {
-  const allowedRoles: Role[] = [
-    Role.CMT_BRIGADA,
-    Role.CMT_CMA,
-    Role.SUPER_ADMIN,
-  ];
+  // COMANDANTE e SUPER_ADMIN podem ver todos os planos
+  const allowedRoles: Role[] = [Role.COMANDANTE, Role.SUPER_ADMIN];
   return allowedRoles.includes(role);
 }
 
-export function getNextApprovalLevel(currentOmType: TipoOM): TipoOM | null {
-  const hierarchy = [
-    TipoOM.COMPANHIA,
-    TipoOM.BATALHAO,
-    TipoOM.BRIGADA,
-    TipoOM.CMA,
-    TipoOM.COTER,
-  ];
-  const currentIndex = hierarchy.indexOf(currentOmType);
-
-  if (currentIndex === -1 || currentIndex === hierarchy.length - 1) {
-    return null; // Já está no topo ou tipo inválido
-  }
-
-  return hierarchy[currentIndex + 1];
-}
-
-export function isApprovalComplete(currentOmType: TipoOM): boolean {
-  return currentOmType === TipoOM.COTER;
-}
-
 /**
- * Mapeia nível hierárquico do workflow para role necessária
- * Níveis:
- * 1 = CMT_OM
- * 2 = CMT_BRIGADA
- * 3 = CMT_CMA (aprovação final)
+ * Verifica se usuário pode aprovar baseado apenas na role.
+ * A verificação completa (incluindo hierarquia de OM) é feita em canUserApprove do approval-chain.ts
  */
-export function getRoleForApprovalLevel(nivel: number): Role | null {
-  const nivelToRole: Record<number, Role> = {
-    1: Role.CMT_OM,
-    2: Role.CMT_BRIGADA,
-    3: Role.CMT_CMA,
-  };
-
-  return nivelToRole[nivel] || null;
-}
-
-/**
- * Verifica se usuário pode aprovar no nível específico
- */
-export function canApproveAtLevel(userRole: Role, nivel: number): boolean {
-  const requiredRole = getRoleForApprovalLevel(nivel);
-
-  if (!requiredRole) return false;
-
+export function canApproveBasedOnRole(userRole: Role): boolean {
   // SUPER_ADMIN pode aprovar em qualquer nível
   if (userRole === Role.SUPER_ADMIN) return true;
 
-  // Usuário deve ter exatamente a role requerida para o nível
-  return userRole === requiredRole;
+  // Apenas S4 pode aprovar nos níveis hierárquicos
+  return userRole === Role.S4;
 }
 
 /**
  * Retorna o nome legível do nível de aprovação
+ * Agora os níveis são dinâmicos baseados na hierarquia de OMs
  */
-export function getApprovalLevelName(nivel: number): string {
-  const names: Record<number, string> = {
-    1: 'Comandante da OM',
-    2: 'Comandante da Brigada',
-    3: 'Comandante do CMA',
-  };
-
-  return names[nivel] || 'Desconhecido';
+export function getApprovalLevelName(nivel: number, omSigla?: string): string {
+  if (omSigla) {
+    return `S4 - ${omSigla}`;
+  }
+  return `Nível ${nivel}`;
 }
 
 /**
- * Verifica se é o último nível de aprovação
+ * Verifica se uma OM pode definir OMs participantes de uma operação.
+ * Apenas a OM criadora da operação pode definir os participantes.
  */
-export function isFinalApprovalLevel(nivel: number): boolean {
-  return nivel === 3; // CMT_CMA é o último nível
+export function canDefineParticipants(
+  userOmId: string,
+  operacaoOmId: string,
+  userRole: Role
+): boolean {
+  // SUPER_ADMIN pode sempre definir participantes
+  if (userRole === Role.SUPER_ADMIN) return true;
+
+  // Usuário deve pertencer à OM criadora da operação
+  return userOmId === operacaoOmId;
+}
+
+/**
+ * Verifica se usuário pode criar plano para uma operação.
+ * Usuário deve pertencer a uma OM que participa da operação.
+ */
+export function canCreatePlanoForOperacao(
+  userRole: Role,
+  userOmParticipates: boolean
+): boolean {
+  // SUPER_ADMIN pode criar plano em qualquer operação
+  if (userRole === Role.SUPER_ADMIN) return true;
+
+  // Verifica se tem permissão básica de criar plano
+  if (!canCreatePlanoTrabalho(userRole)) return false;
+
+  // Usuário deve pertencer a uma OM participante
+  return userOmParticipates;
+}
+
+/**
+ * Verifica se usuário pode editar um plano.
+ * Apenas o responsável, S4 da OM ou SUPER_ADMIN podem editar.
+ */
+export function canEditPlano(
+  userRole: Role,
+  userId: string,
+  planoResponsavelId: string,
+  userOmId: string,
+  planoOmId: string
+): boolean {
+  // SUPER_ADMIN pode editar qualquer plano
+  if (userRole === Role.SUPER_ADMIN) return true;
+
+  // Responsável pelo plano pode editar
+  if (userId === planoResponsavelId) return true;
+
+  // S4 da OM dona do plano pode editar
+  if (userRole === Role.S4 && userOmId === planoOmId) return true;
+
+  return false;
+}
+
+/**
+ * Verifica se usuário pode enviar plano para análise.
+ */
+export function canSendToAnalysis(
+  userRole: Role,
+  userId: string,
+  planoResponsavelId: string,
+  userOmId: string,
+  planoOmId: string
+): boolean {
+  // Mesmas regras de edição
+  return canEditPlano(
+    userRole,
+    userId,
+    planoResponsavelId,
+    userOmId,
+    planoOmId
+  );
+}
+
+/**
+ * Verifica se usuário pode ver operações de outras OMs.
+ */
+export function canViewOtherOmsOperations(role: Role): boolean {
+  const allowedRoles: Role[] = [Role.S4, Role.COMANDANTE, Role.SUPER_ADMIN];
+  return allowedRoles.includes(role);
+}
+
+/**
+ * Verifica se usuário pode ver todos os planos de uma operação
+ * (não apenas os da sua OM).
+ */
+export function canViewAllPlanosOfOperation(
+  userRole: Role,
+  userOmId: string,
+  operacaoOmId: string
+): boolean {
+  // SUPER_ADMIN vê todos
+  if (userRole === Role.SUPER_ADMIN) return true;
+
+  // S4 e COMANDANTE da OM criadora veem todos
+  if (userOmId === operacaoOmId) {
+    return userRole === Role.S4 || userRole === Role.COMANDANTE;
+  }
+
+  return false;
 }

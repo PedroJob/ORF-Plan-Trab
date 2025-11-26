@@ -9,7 +9,7 @@ import Link from "next/link";
 import { DespesasLogistico } from "@/components/despesas/DespesasLogistico";
 import { StatusAprovacao } from "@/components/planos/StatusAprovacao";
 import { HistoricoAprovacoes } from "@/components/planos/HistoricoAprovacoes";
-import { DespesaWithRelations } from "@/types/despesas";
+import { DespesaWithRelations, UserOM } from "@/types/despesas";
 import { PlanoTrabalho, Prisma } from "@prisma/client";
 import { PlanoTrabalhoWithRelations } from "@/types/plano-trabalho";
 
@@ -40,6 +40,7 @@ export default function PlanoTrabalhoPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddItem, setShowAddItem] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [userOm, setUserOm] = useState<UserOM | null>(null);
 
   // Form state for new item
   const [newItem, setNewItem] = useState({
@@ -112,6 +113,13 @@ export default function PlanoTrabalhoPage() {
       if (response.ok) {
         const data = await response.json();
         setCurrentUserRole(data.role);
+        if (data.om) {
+          setUserOm({
+            id: data.om.id,
+            nome: data.om.nome,
+            sigla: data.om.sigla,
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching current user:", error);
@@ -119,25 +127,21 @@ export default function PlanoTrabalhoPage() {
   };
 
   // Verifica se o usuário atual pode aprovar no nível atual do plano
+  // Fluxo simplificado: apenas 1 nível de aprovação (S4)
   const canApproveCurrentLevel = (): boolean => {
     if (!plano || !currentUserRole || !plano.nivelAprovacaoAtual) {
       return false;
     }
 
-    // Mapeia nível para role necessária
-    const nivelToRole: Record<number, string> = {
-      1: "CMT_OM",
-      2: "CMT_BRIGADA",
-      3: "CMT_CMA",
-    };
-
-    const requiredRole = nivelToRole[plano.nivelAprovacaoAtual];
-
     // SUPER_ADMIN pode aprovar em qualquer nível
     if (currentUserRole === "SUPER_ADMIN") return true;
 
-    // Usuário deve ter a role exata do nível
-    return currentUserRole === requiredRole;
+    // Apenas S4 pode aprovar (nível 1 é o único)
+    if (plano.nivelAprovacaoAtual === 1) {
+      return currentUserRole === "S4";
+    }
+
+    return false;
   };
 
   const handleAddItem = async (e: React.FormEvent) => {
@@ -385,6 +389,7 @@ export default function PlanoTrabalhoPage() {
             operacao={plano.operacao as any}
             canEdit={plano.status === "RASCUNHO"}
             onRefresh={fetchData}
+            userOm={userOm}
           />
         ) : (
           <>

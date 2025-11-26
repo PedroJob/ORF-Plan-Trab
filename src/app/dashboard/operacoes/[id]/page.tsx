@@ -1,12 +1,54 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { ArrowLeft, Plus, Calendar, Users, FileText, AlertCircle, Trash2 } from 'lucide-react';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import {
+  ArrowLeft,
+  Plus,
+  Calendar,
+  Users,
+  FileText,
+  AlertCircle,
+  Trash2,
+  Building2,
+  DollarSign,
+  CheckCircle2,
+  Clock,
+} from "lucide-react";
+import Link from "next/link";
+import { format } from "date-fns";
+
+interface OMParticipante {
+  id: string;
+  omId: string;
+  valorLimite: number;
+  om: {
+    id: string;
+    nome: string;
+    sigla: string;
+    tipo: string;
+  };
+}
+
+interface PlanoTrabalho {
+  id: string;
+  titulo: string;
+  versao: number;
+  status: string;
+  omId: string;
+  valorTotalDespesas?: number;
+  responsavel: {
+    nomeCompleto: string;
+    nomeGuerra?: string;
+    postoGraduacao: string;
+  };
+  om?: {
+    id: string;
+    nome: string;
+    sigla: string;
+  };
+}
 
 interface Operacao {
   id: string;
@@ -17,6 +59,7 @@ interface Operacao {
   dataFinal: string;
   status: string;
   prioridade: string;
+  valorLimiteTotal?: number;
   finalidade?: string;
   motivacao?: string;
   consequenciaNaoAtendimento?: string;
@@ -27,17 +70,8 @@ interface Operacao {
     sigla: string;
     tipo: string;
   };
-  planosTrabalho: Array<{
-    id: string;
-    titulo: string;
-    versao: number;
-    status: string;
-    responsavel: {
-      nomeCompleto: string;
-      nomeGuerra?: string;
-      postoGraduacao: string;
-    };
-  }>;
+  omsParticipantes: OMParticipante[];
+  planosTrabalho: PlanoTrabalho[];
 }
 
 export default function OperacaoDetailPage() {
@@ -63,7 +97,7 @@ export default function OperacaoDetailPage() {
         setOperacao(data);
       }
     } catch (error) {
-      console.error('Error fetching operacao:', error);
+      console.error("Error fetching operacao:", error);
     } finally {
       setIsLoading(false);
     }
@@ -71,47 +105,72 @@ export default function OperacaoDetailPage() {
 
   const getStatusColor = (status: string) => {
     const colors = {
-      RASCUNHO: 'bg-olive-100 text-olive-800',
-      EM_ANALISE: 'bg-amber-100 text-amber-800',
-      APROVADO: 'bg-military-200 text-military-900',
-      REPROVADO: 'bg-red-100 text-red-800',
+      RASCUNHO: "bg-olive-100 text-olive-800",
+      EM_ANALISE: "bg-amber-100 text-amber-800",
+      APROVADO: "bg-military-200 text-military-900",
+      REPROVADO: "bg-red-100 text-red-800",
     };
-    return colors[status as keyof typeof colors] || 'bg-olive-100 text-olive-800';
+    return colors[status as keyof typeof colors] || "bg-olive-100 text-olive-800";
   };
 
   const getPrioridadeColor = (prioridade: string) => {
     const colors = {
-      BAIXA: 'bg-military-100 text-military-700',
-      MEDIA: 'bg-amber-100 text-amber-700',
-      ALTA: 'bg-orange-100 text-orange-800',
-      CRITICA: 'bg-red-100 text-red-800',
+      BAIXA: "bg-military-100 text-military-700",
+      MEDIA: "bg-amber-100 text-amber-700",
+      ALTA: "bg-orange-100 text-orange-800",
+      CRITICA: "bg-red-100 text-red-800",
     };
-    return colors[prioridade as keyof typeof colors] || 'bg-olive-100 text-olive-800';
+    return (
+      colors[prioridade as keyof typeof colors] || "bg-olive-100 text-olive-800"
+    );
   };
 
   const handleDelete = async () => {
-    if (!confirm('Tem certeza que deseja excluir esta operação? Esta ação não pode ser desfeita.')) {
+    if (
+      !confirm(
+        "Tem certeza que deseja excluir esta operação? Esta ação não pode ser desfeita."
+      )
+    ) {
       return;
     }
 
     setIsDeleting(true);
     try {
       const response = await fetch(`/api/operacoes/${id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       if (response.ok) {
-        router.push('/dashboard/operacoes');
+        router.push("/dashboard/operacoes");
       } else {
         const error = await response.json();
         alert(`Erro ao excluir operação: ${error.error}`);
       }
     } catch (error) {
-      console.error('Error deleting operacao:', error);
-      alert('Erro ao excluir operação');
+      console.error("Error deleting operacao:", error);
+      alert("Erro ao excluir operação");
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const formatCurrency = (value: number) => {
+    return value.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  };
+
+  // Calcular valor total utilizado (soma dos planos)
+  const valorTotalUtilizado =
+    operacao?.planosTrabalho.reduce(
+      (acc, plano) => acc + (Number(plano.valorTotalDespesas) || 0),
+      0
+    ) || 0;
+
+  // Obter plano de uma OM específica
+  const getPlanoByOm = (omId: string) => {
+    return operacao?.planosTrabalho.find((p) => p.omId === omId);
   };
 
   if (isLoading) {
@@ -126,8 +185,12 @@ export default function OperacaoDetailPage() {
     return (
       <div className="text-center py-12">
         <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-military-900 mb-2">Operação não encontrada</h2>
-        <p className="text-olive-700 mb-6">A operação que você procura não existe ou foi removida</p>
+        <h2 className="text-2xl font-bold text-military-900 mb-2">
+          Operação não encontrada
+        </h2>
+        <p className="text-olive-700 mb-6">
+          A operação que você procura não existe ou foi removida
+        </p>
         <Link href="/dashboard/operacoes">
           <Button variant="secondary">Voltar para Operações</Button>
         </Link>
@@ -147,8 +210,12 @@ export default function OperacaoDetailPage() {
         </Link>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-military-900 mb-2">{operacao.nome}</h1>
-            <p className="text-olive-700">{operacao.om.nome}</p>
+            <h1 className="text-3xl font-bold text-military-900 mb-2">
+              {operacao.nome}
+            </h1>
+            <p className="text-olive-700">
+              Criada por: {operacao.om.sigla} - {operacao.om.nome}
+            </p>
           </div>
           <div className="flex gap-2">
             <span
@@ -163,7 +230,7 @@ export default function OperacaoDetailPage() {
                 operacao.status
               )}`}
             >
-              {operacao.status.replace('_', ' ')}
+              {operacao.status.replace("_", " ")}
             </span>
             <Button
               variant="secondary"
@@ -172,25 +239,31 @@ export default function OperacaoDetailPage() {
               className="bg-red-50 text-red-700 hover:bg-red-100 border-red-200"
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              {isDeleting ? 'Excluindo...' : 'Excluir'}
+              {isDeleting ? "Excluindo..." : "Excluir"}
             </Button>
           </div>
         </div>
       </div>
 
       {/* Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white p-6 rounded-lg border border-olive-200">
           <div className="flex items-center gap-3 mb-2">
             <Users className="w-5 h-5 text-military-600" />
             <div className="text-sm text-olive-700">Efetivo</div>
           </div>
-          <div className="text-2xl font-bold text-military-900">{operacao.efetivoMil}</div>
-          <div className="text-xs text-olive-600 mt-1">militares</div>
           <div className="text-2xl font-bold text-military-900">
-            {operacao.efetivoExt ? operacao.efetivoExt : 0}
+            {operacao.efetivoMil}
           </div>
-          <div className="text-xs text-olive-600 mt-1">agentes externos</div>
+          <div className="text-xs text-olive-600 mt-1">militares</div>
+          {operacao.efetivoExt && (
+            <>
+              <div className="text-lg font-bold text-military-900 mt-2">
+                {operacao.efetivoExt}
+              </div>
+              <div className="text-xs text-olive-600">agentes externos</div>
+            </>
+          )}
         </div>
 
         <div className="bg-white p-6 rounded-lg border border-olive-200">
@@ -199,29 +272,139 @@ export default function OperacaoDetailPage() {
             <div className="text-sm text-olive-700">Período</div>
           </div>
           <div className="text-lg font-semibold text-military-900">
-            {format(new Date(operacao.dataInicio), 'dd/MM/yyyy')} até{' '}
-            {format(new Date(operacao.dataFinal), 'dd/MM/yyyy')}
+            {format(new Date(operacao.dataInicio), "dd/MM/yyyy")} até{" "}
+            {format(new Date(operacao.dataFinal), "dd/MM/yyyy")}
           </div>
           <div className="text-xs text-olive-600 mt-1">
             {Math.ceil(
-              (new Date(operacao.dataFinal).getTime() - new Date(operacao.dataInicio).getTime()) /
+              (new Date(operacao.dataFinal).getTime() -
+                new Date(operacao.dataInicio).getTime()) /
                 (1000 * 60 * 60 * 24)
-            )}{' '}
+            )}{" "}
             dias
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-lg border border-olive-200">
           <div className="flex items-center gap-3 mb-2">
-            <FileText className="w-5 h-5 text-military-600" />
-            <div className="text-sm text-olive-700">Planos de Trabalho</div>
+            <DollarSign className="w-5 h-5 text-military-600" />
+            <div className="text-sm text-olive-700">Valor Limite Total</div>
           </div>
           <div className="text-2xl font-bold text-military-900">
-            {operacao.planosTrabalho.length}
+            {operacao.valorLimiteTotal
+              ? formatCurrency(Number(operacao.valorLimiteTotal))
+              : "Não definido"}
           </div>
-          <div className="text-xs text-olive-600 mt-1">cadastrados</div>
+          {operacao.valorLimiteTotal && (
+            <div className="text-xs text-olive-600 mt-1">
+              Utilizado: {formatCurrency(valorTotalUtilizado)} (
+              {((valorTotalUtilizado / Number(operacao.valorLimiteTotal)) * 100).toFixed(1)}
+              %)
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white p-6 rounded-lg border border-olive-200">
+          <div className="flex items-center gap-3 mb-2">
+            <Building2 className="w-5 h-5 text-military-600" />
+            <div className="text-sm text-olive-700">OMs Participantes</div>
+          </div>
+          <div className="text-2xl font-bold text-military-900">
+            {operacao.omsParticipantes.length}
+          </div>
+          <div className="text-xs text-olive-600 mt-1">
+            {operacao.planosTrabalho.length} planos cadastrados
+          </div>
         </div>
       </div>
+
+      {/* OMs Participantes */}
+      {operacao.omsParticipantes.length > 0 && (
+        <div className="bg-white rounded-lg border border-olive-200 p-6 mb-6">
+          <h2 className="text-xl font-semibold text-military-900 mb-4">
+            OMs Participantes
+          </h2>
+          <div className="space-y-3">
+            {operacao.omsParticipantes.map((omPart) => {
+              const plano = getPlanoByOm(omPart.omId);
+              const valorUtilizado = plano
+                ? Number(plano.valorTotalDespesas) || 0
+                : 0;
+              const percentual =
+                Number(omPart.valorLimite) > 0
+                  ? (valorUtilizado / Number(omPart.valorLimite)) * 100
+                  : 0;
+
+              return (
+                <div
+                  key={omPart.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                >
+                  <div className="flex items-center gap-4">
+                    <Building2 className="w-8 h-8 text-military-600" />
+                    <div>
+                      <div className="font-medium text-military-900">
+                        {omPart.om.sigla} - {omPart.om.nome}
+                      </div>
+                      <div className="text-sm text-olive-600">
+                        Tipo: {omPart.om.tipo}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <div className="text-sm text-olive-600">Valor Limite</div>
+                      <div className="font-semibold text-military-900">
+                        {formatCurrency(Number(omPart.valorLimite))}
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-sm text-olive-600">Utilizado</div>
+                      <div
+                        className={`font-semibold ${percentual > 100 ? "text-red-600" : "text-military-900"}`}
+                      >
+                        {formatCurrency(valorUtilizado)} ({percentual.toFixed(1)}%)
+                      </div>
+                    </div>
+
+                    <div className="w-32">
+                      {plano ? (
+                        <Link href={`/dashboard/planos/${plano.id}`}>
+                          <div
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg ${getStatusColor(plano.status)}`}
+                          >
+                            {plano.status === "APROVADO" ? (
+                              <CheckCircle2 className="w-4 h-4" />
+                            ) : (
+                              <Clock className="w-4 h-4" />
+                            )}
+                            <span className="text-sm font-medium">
+                              {plano.status.replace("_", " ")}
+                            </span>
+                          </div>
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/dashboard/planos/novo?operacaoId=${operacao.id}`}
+                        >
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-200 text-gray-600 hover:bg-gray-300">
+                            <Plus className="w-4 h-4" />
+                            <span className="text-sm font-medium">
+                              Criar Plano
+                            </span>
+                          </div>
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Campos Descritivos */}
       {(operacao.finalidade ||
@@ -229,20 +412,30 @@ export default function OperacaoDetailPage() {
         operacao.consequenciaNaoAtendimento ||
         operacao.observacoes) && (
         <div className="bg-white rounded-lg border border-olive-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-military-900 mb-4">Detalhes da Operação</h2>
+          <h2 className="text-xl font-semibold text-military-900 mb-4">
+            Detalhes da Operação
+          </h2>
 
           <div className="space-y-4">
             {operacao.finalidade && (
               <div>
-                <h3 className="text-sm font-semibold text-military-700 mb-2">Finalidade</h3>
-                <p className="text-olive-800 whitespace-pre-wrap">{operacao.finalidade}</p>
+                <h3 className="text-sm font-semibold text-military-700 mb-2">
+                  Finalidade
+                </h3>
+                <p className="text-olive-800 whitespace-pre-wrap">
+                  {operacao.finalidade}
+                </p>
               </div>
             )}
 
             {operacao.motivacao && (
               <div>
-                <h3 className="text-sm font-semibold text-military-700 mb-2">Motivação</h3>
-                <p className="text-olive-800 whitespace-pre-wrap">{operacao.motivacao}</p>
+                <h3 className="text-sm font-semibold text-military-700 mb-2">
+                  Motivação
+                </h3>
+                <p className="text-olive-800 whitespace-pre-wrap">
+                  {operacao.motivacao}
+                </p>
               </div>
             )}
 
@@ -259,8 +452,12 @@ export default function OperacaoDetailPage() {
 
             {operacao.observacoes && (
               <div>
-                <h3 className="text-sm font-semibold text-military-700 mb-2">Observações</h3>
-                <p className="text-olive-800 whitespace-pre-wrap">{operacao.observacoes}</p>
+                <h3 className="text-sm font-semibold text-military-700 mb-2">
+                  Observações
+                </h3>
+                <p className="text-olive-800 whitespace-pre-wrap">
+                  {operacao.observacoes}
+                </p>
               </div>
             )}
           </div>
@@ -270,7 +467,9 @@ export default function OperacaoDetailPage() {
       {/* Planos de Trabalho */}
       <div className="bg-white rounded-lg border border-olive-200 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-military-900">Planos de Trabalho</h2>
+          <h2 className="text-xl font-semibold text-military-900">
+            Planos de Trabalho
+          </h2>
           <Link href={`/dashboard/planos/novo?operacaoId=${operacao.id}`}>
             <Button size="sm">
               <Plus className="w-4 h-4 mr-2" />
@@ -282,7 +481,9 @@ export default function OperacaoDetailPage() {
         {operacao.planosTrabalho.length === 0 ? (
           <div className="text-center py-12">
             <FileText className="w-12 h-12 text-olive-400 mx-auto mb-4" />
-            <p className="text-olive-700 mb-4">Nenhum plano de trabalho cadastrado</p>
+            <p className="text-olive-700 mb-4">
+              Nenhum plano de trabalho cadastrado
+            </p>
             <Link href={`/dashboard/planos/novo?operacaoId=${operacao.id}`}>
               <Button variant="secondary" size="sm">
                 <Plus className="w-4 h-4 mr-2" />
@@ -300,12 +501,24 @@ export default function OperacaoDetailPage() {
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg font-medium text-military-900">{plano.titulo}</h3>
+                    <h3 className="text-lg font-medium text-military-900">
+                      {plano.titulo}
+                    </h3>
                     <span className="text-xs text-olive-600">v{plano.versao}</span>
+                    {plano.om && (
+                      <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                        {plano.om.sigla}
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm text-olive-700">
-                    {plano.responsavel.postoGraduacao}{' '}
+                    {plano.responsavel.postoGraduacao}{" "}
                     {plano.responsavel.nomeGuerra || plano.responsavel.nomeCompleto}
+                    {plano.valorTotalDespesas && (
+                      <span className="ml-2">
+                        • {formatCurrency(Number(plano.valorTotalDespesas))}
+                      </span>
+                    )}
                   </p>
                 </div>
                 <span
@@ -313,7 +526,7 @@ export default function OperacaoDetailPage() {
                     plano.status
                   )}`}
                 >
-                  {plano.status.replace('_', ' ')}
+                  {plano.status.replace("_", " ")}
                 </span>
               </Link>
             ))}

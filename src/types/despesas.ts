@@ -104,6 +104,15 @@ export type DespesaWithRelations = Prisma.DespesaGetPayload<{
 // ============================================
 
 /**
+ * OM do usuário logado para uso nos formulários de despesa
+ */
+export interface UserOM {
+  id: string;
+  nome: string;
+  sigla: string;
+}
+
+/**
  * Rateio (distribution) of expense across OMs
  */
 export interface RateioOM {

@@ -5,7 +5,7 @@ import { Calculator, AlertCircle, Info } from "lucide-react";
 interface PreviewCalculoProps {
   valorTotal: number | null;
   valorCombustivel?: number | null;
-  carimbo?: any;
+  carimbo?: string;
   loading?: boolean;
   error?: string;
   isCombustivel?: boolean;
@@ -14,7 +14,6 @@ interface PreviewCalculoProps {
 export function PreviewCalculo({
   valorTotal,
   valorCombustivel,
-  carimbo,
   loading = false,
   error,
   isCombustivel = false,
@@ -91,15 +90,6 @@ export function PreviewCalculo({
             {formatCurrency(valorTotal)}
           </p>
         </div>
-
-        <details className="bg-white rounded-md border border-green-200">
-          <summary className="px-3 py-2 cursor-pointer text-sm text-gray-700 hover:bg-gray-50 rounded-md font-medium">
-            Ver detalhes do cálculo
-          </summary>
-          <div className="px-3 pb-3 pt-2 space-y-1.5">
-            <span className="font-mono text-gray-900">{carimbo}</span>
-          </div>
-        </details>
       </div>
     </div>
   );

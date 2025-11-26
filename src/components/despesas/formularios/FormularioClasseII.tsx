@@ -13,32 +13,34 @@ import {
 } from "@/lib/calculos/classeII";
 import { Trash2, Plus, X } from "lucide-react";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
-import { Operacao } from "@prisma/client";
-import { OperacaoWithEfetivo } from "@/types/despesas";
+import { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
 
 interface FormularioClasseIIProps {
   operacao: OperacaoWithEfetivo;
   value: ParametrosClasseII | null;
   onChange: (params: HandleParametrosChange) => void;
+  userOm: UserOM | null;
 }
 
 const LABELS_TIPO_MATERIAL: Record<TipoMaterialClasseII, string> = {
   EQUIPAMENTO_INDIVIDUAL: "Equipamento Individual",
   MATERIAL_BALISTICO: "Material Balístico",
   ESTACIONAMENTO_ALOJAMENTO: "Estacionamento/Alojamento",
-  FARDAMENTO: "Fardamento",
 };
 
 export function FormularioClasseII({
   operacao,
   value,
   onChange,
+  userOm,
 }: FormularioClasseIIProps) {
   const [materiais, setMateriais] = useState<MaterialClasseII[]>(
     value?.materiais || []
   );
   const [valorTotal, setValorTotal] = useState<number | null>(null);
-  const [carimbo, setCarimbo] = useState<string | null>(null);
+  const [carimbo, setCarimbo] = useState<string>("");
+  const [carimboEditadoManualmente, setCarimboEditadoManualmente] =
+    useState(false);
 
   const calcularDias = () => {
     const inicio = new Date(operacao.dataInicio);
@@ -57,9 +59,8 @@ export function FormularioClasseII({
 
   // Estados para formulários específicos
   const [numeroMilitares, setNumeroMilitares] = useState(0);
-  const [numeroUsuarios, setNumeroUsuarios] = useState(0);
   const [periodoDias, setPeriodoDias] = useState(intervaloDias);
-  const [valorFardamento, setValorFardamento] = useState(0);
+  const [itensBalisticos, setItensBalisticos] = useState<ItemManutencao[]>([]);
   const [itensEstacionamento, setItensEstacionamento] = useState<
     ItemManutencao[]
   >([]);
@@ -77,14 +78,22 @@ export function FormularioClasseII({
   const calcular = () => {
     if (materiais.length === 0) {
       setValorTotal(null);
-      setCarimbo(null);
+      setCarimbo("");
       return;
     }
 
     try {
-      const resultado = calcularClasseII({ materiais });
+      const resultado = calcularClasseII(
+        { materiais },
+        userOm?.sigla,
+        operacao.nome
+      );
       setValorTotal(resultado.valorTotal);
+
+      // Sempre regenerar carimbo dos parâmetros
       setCarimbo(resultado.carimbo);
+      setCarimboEditadoManualmente(false);
+
       onChange({
         params: { materiais },
         valor: resultado.valorTotal,
@@ -103,7 +112,6 @@ export function FormularioClasseII({
       "EQUIPAMENTO_INDIVIDUAL",
       "MATERIAL_BALISTICO",
       "ESTACIONAMENTO_ALOJAMENTO",
-      "FARDAMENTO",
     ];
     return todosTipos.filter((tipo) => !tiposAdicionados.includes(tipo));
   };
@@ -127,14 +135,13 @@ export function FormularioClasseII({
         break;
 
       case "MATERIAL_BALISTICO":
-        if (numeroUsuarios <= 0 || periodoDias <= 0) {
-          alert("Preencha todos os campos obrigatórios");
+        if (itensBalisticos.length === 0) {
+          alert("Adicione pelo menos um item balístico");
           return;
         }
         novoMaterial = {
           tipo: "MATERIAL_BALISTICO",
-          numeroUsuarios,
-          periodoDias,
+          itens: itensBalisticos,
         };
         break;
 
@@ -146,17 +153,6 @@ export function FormularioClasseII({
         novoMaterial = {
           tipo: "ESTACIONAMENTO_ALOJAMENTO",
           itens: itensEstacionamento,
-        };
-        break;
-
-      case "FARDAMENTO":
-        if (valorFardamento <= 0) {
-          alert("Informe o valor do fardamento");
-          return;
-        }
-        novoMaterial = {
-          tipo: "FARDAMENTO",
-          valorFardamento,
         };
         break;
     }
@@ -171,9 +167,8 @@ export function FormularioClasseII({
     setTipoSelecionado(null);
     setShowFormulario(false);
     setNumeroMilitares(0);
-    setNumeroUsuarios(0);
     setPeriodoDias(0);
-    setValorFardamento(0);
+    setItensBalisticos([]);
     setItensEstacionamento([]);
     setNovoItem({ tipo: "", quantidade: 1, mntDia: 0, periodoDias: 0 });
   };
@@ -181,6 +176,25 @@ export function FormularioClasseII({
   const removerMaterial = (index: number) => {
     const novosMateriais = materiais.filter((_, i) => i !== index);
     setMateriais(novosMateriais);
+  };
+
+  const adicionarItemBalistico = (tipo: "Capacete Balístico" | "Colete Balístico") => {
+    const valorDia = tipo === "Capacete Balístico"
+      ? VALORES_MANUTENCAO.CAPACETE_DIA
+      : VALORES_MANUTENCAO.COLETE_DIA;
+
+    const novoItem: ItemManutencao = {
+      tipo,
+      quantidade: 1,
+      mntDia: valorDia,
+      periodoDias: intervaloDias,
+    };
+
+    setItensBalisticos([...itensBalisticos, novoItem]);
+  };
+
+  const removerItemBalistico = (index: number) => {
+    setItensBalisticos(itensBalisticos.filter((_, i) => i !== index));
   };
 
   const adicionarItemEstacionamento = () => {
@@ -236,105 +250,38 @@ export function FormularioClasseII({
           material.periodoDias
         );
       case "MATERIAL_BALISTICO":
-        return (
-          material.numeroUsuarios *
-          VALORES_MANUTENCAO.BALISTICO_TOTAL_DIA *
-          material.periodoDias
+        return material.itens.reduce(
+          (sum, item) => sum + item.quantidade * item.mntDia * item.periodoDias,
+          0
         );
       case "ESTACIONAMENTO_ALOJAMENTO":
         return material.itens.reduce(
           (sum, item) => sum + item.quantidade * item.mntDia * item.periodoDias,
           0
         );
-      case "FARDAMENTO":
-        return material.valorFardamento;
+      default:
+        return 0;
     }
+  };
+
+  const handleCarimboChange = (novoCarimbo: string) => {
+    setCarimbo(novoCarimbo);
+    setCarimboEditadoManualmente(true);
+
+    onChange({
+      params: { materiais },
+      valor: valorTotal || 0,
+      descricao: novoCarimbo,
+    });
+  };
+
+  const handleResetCarimbo = () => {
+    setCarimboEditadoManualmente(false);
+    calcular();
   };
 
   return (
     <div className="space-y-4">
-      {materiais.length > 0 && (
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Materiais Adicionados
-          </label>
-          {materiais.map((material, index) => (
-            <div
-              key={index}
-              className="bg-gray-50 border border-gray-200 rounded-md p-3"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
-                      {LABELS_TIPO_MATERIAL[material.tipo]}
-                    </span>
-                    <span className="text-sm font-semibold text-gray-900">
-                      R$ {calcularValorMaterial(material).toFixed(2)}
-                    </span>
-                  </div>
-
-                  {material.tipo === "EQUIPAMENTO_INDIVIDUAL" && (
-                    <p className="text-xs text-gray-600">
-                      {material.numeroMilitares} militares ×{" "}
-                      {material.periodoDias} dias × R${" "}
-                      {VALORES_MANUTENCAO.EQUIPAMENTO_INDIVIDUAL_DIA.toFixed(2)}
-                      /dia
-                    </p>
-                  )}
-
-                  {material.tipo === "MATERIAL_BALISTICO" && (
-                    <p className="text-xs text-gray-600">
-                      {material.numeroUsuarios} usuários ×{" "}
-                      {material.periodoDias} dias × R${" "}
-                      {VALORES_MANUTENCAO.BALISTICO_TOTAL_DIA.toFixed(2)}/dia
-                    </p>
-                  )}
-
-                  {material.tipo === "ESTACIONAMENTO_ALOJAMENTO" && (
-                    <div className="text-xs text-gray-600">
-                      <p className="font-medium mb-1">
-                        {material.itens.length} item(ns):
-                      </p>
-                      <ul className="space-y-1 ml-3">
-                        {material.itens.map((item, i) => (
-                          <li key={i}>
-                            {item.tipo}: {item.quantidade} × R${" "}
-                            {item.mntDia.toFixed(2)} × {item.periodoDias} dias =
-                            R${" "}
-                            {(
-                              item.quantidade *
-                              item.mntDia *
-                              item.periodoDias
-                            ).toFixed(2)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {material.tipo === "FARDAMENTO" && (
-                    <p className="text-xs text-gray-600">
-                      Valor conforme IRDU: R${" "}
-                      {material.valorFardamento.toFixed(2)}
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => removerMaterial(index)}
-                  className="ml-2 p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                  title="Remover material"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Adicionar novo material */}
       {tiposDisponiveis().length > 0 && (
         <div className="border-t pt-4">
@@ -387,6 +334,7 @@ export function FormularioClasseII({
                     <input
                       type="number"
                       min="1"
+                      step="1"
                       value={numeroMilitares || ""}
                       onChange={(e) =>
                         setNumeroMilitares(parseInt(e.target.value) || 0)
@@ -402,10 +350,13 @@ export function FormularioClasseII({
                     <input
                       type="number"
                       min="1"
+                      max={intervaloDias}
+                      step="1"
                       value={periodoDias || ""}
-                      onChange={(e) =>
-                        setPeriodoDias(parseInt(e.target.value) || 0)
-                      }
+                      onChange={(e) => {
+                        const valor = parseInt(e.target.value) || 0;
+                        setPeriodoDias(Math.min(valor, intervaloDias));
+                      }}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
                       placeholder="Dias de operação"
                     />
@@ -415,63 +366,78 @@ export function FormularioClasseII({
 
               {/* Formulário Material Balístico */}
               {tipoSelecionado === "MATERIAL_BALISTICO" && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Militares empregados{" "}
-                      <span className="text-red-500">*</span>
+                    <label className="block text-xs font-medium text-gray-700 mb-2">
+                      Itens Balísticos
                     </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={numeroUsuarios || ""}
-                      onChange={(e) =>
-                        setNumeroUsuarios(parseInt(e.target.value) || 0)
-                      }
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
-                      placeholder="Usuários de material balístico"
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => adicionarItemBalistico("Capacete Balístico")}
+                        className="px-3 py-2 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+                      >
+                        + Capacete (R$ {VALORES_MANUTENCAO.CAPACETE_DIA.toFixed(2)}/dia)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => adicionarItemBalistico("Colete Balístico")}
+                        className="px-3 py-2 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+                      >
+                        + Colete (R$ {VALORES_MANUTENCAO.COLETE_DIA.toFixed(2)}/dia)
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Período (dias) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={periodoDias || ""}
-                      onChange={(e) =>
-                        setPeriodoDias(parseInt(e.target.value) || 0)
-                      }
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
-                      placeholder="Dias de operação"
-                    />
-                  </div>
-                </div>
-              )}
 
-              {/* Formulário Fardamento */}
-              {tipoSelecionado === "FARDAMENTO" && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Valor do Fardamento (R$){" "}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={valorFardamento || ""}
-                    onChange={(e) =>
-                      setValorFardamento(parseFloat(e.target.value) || 0)
-                    }
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
-                    placeholder="Valor total conforme IRDU"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Informar valor total conforme necessidades específicas e
-                    IRDU
-                  </p>
+                  {itensBalisticos.length > 0 && (
+                    <div className="space-y-2">
+                      {itensBalisticos.map((item, index) => (
+                        <div
+                          key={index}
+                          className="bg-gray-50 rounded border border-gray-200 p-2 flex items-center justify-between"
+                        >
+                          <div className="flex-1 grid grid-cols-3 gap-2 text-xs">
+                            <span className="font-medium">{item.tipo}</span>
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={item.quantidade}
+                              onChange={(e) => {
+                                const novosItens = [...itensBalisticos];
+                                novosItens[index].quantidade = parseInt(e.target.value) || 1;
+                                setItensBalisticos(novosItens);
+                              }}
+                              className="px-2 py-1 border border-gray-300 rounded"
+                              placeholder="Qtd"
+                            />
+                            <input
+                              type="number"
+                              min="1"
+                              max={intervaloDias}
+                              step="1"
+                              value={item.periodoDias}
+                              onChange={(e) => {
+                                const valor = parseInt(e.target.value) || 1;
+                                const novosItens = [...itensBalisticos];
+                                novosItens[index].periodoDias = Math.min(valor, intervaloDias);
+                                setItensBalisticos(novosItens);
+                              }}
+                              className="px-2 py-1 border border-gray-300 rounded"
+                              placeholder="Dias"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removerItemBalistico(index)}
+                            className="ml-2 p-1 text-red-600 hover:bg-red-50 rounded"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -617,7 +583,125 @@ export function FormularioClasseII({
         </div>
       )}
 
-      <PreviewCalculo valorTotal={valorTotal} carimbo={carimbo} />
+      {materiais.length > 0 && (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Materiais Adicionados
+          </label>
+          {materiais.map((material, index) => (
+            <div
+              key={index}
+              className="bg-gray-50 border border-gray-200 rounded-md p-3"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                      {LABELS_TIPO_MATERIAL[material.tipo]}
+                    </span>
+                    <span className="text-sm font-semibold text-gray-900">
+                      R$ {calcularValorMaterial(material).toFixed(2)}
+                    </span>
+                  </div>
+
+                  {material.tipo === "EQUIPAMENTO_INDIVIDUAL" && (
+                    <p className="text-xs text-gray-600">
+                      {material.numeroMilitares} militares ×{" "}
+                      {material.periodoDias} dias × R${" "}
+                      {VALORES_MANUTENCAO.EQUIPAMENTO_INDIVIDUAL_DIA.toFixed(2)}
+                      /dia
+                    </p>
+                  )}
+
+                  {material.tipo === "MATERIAL_BALISTICO" && (
+                    <div className="text-xs text-gray-600">
+                      <p className="font-medium mb-1">
+                        {material.itens.length} item(ns):
+                      </p>
+                      <ul className="space-y-1 ml-3">
+                        {material.itens.map((item, i) => (
+                          <li key={i}>
+                            {item.tipo}: {item.quantidade} × R${" "}
+                            {item.mntDia.toFixed(2)} × {item.periodoDias} dias =
+                            R${" "}
+                            {(
+                              item.quantidade *
+                              item.mntDia *
+                              item.periodoDias
+                            ).toFixed(2)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {material.tipo === "ESTACIONAMENTO_ALOJAMENTO" && (
+                    <div className="text-xs text-gray-600">
+                      <p className="font-medium mb-1">
+                        {material.itens.length} item(ns):
+                      </p>
+                      <ul className="space-y-1 ml-3">
+                        {material.itens.map((item, i) => (
+                          <li key={i}>
+                            {item.tipo}: {item.quantidade} × R${" "}
+                            {item.mntDia.toFixed(2)} × {item.periodoDias} dias =
+                            R${" "}
+                            {(
+                              item.quantidade *
+                              item.mntDia *
+                              item.periodoDias
+                            ).toFixed(2)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => removerMaterial(index)}
+                  className="ml-2 p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                  title="Remover material"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <PreviewCalculo valorTotal={valorTotal} />
+
+      {/* Carimbo editável */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">
+            Carimbo
+          </label>
+          {carimboEditadoManualmente && (
+            <button
+              type="button"
+              onClick={handleResetCarimbo}
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              Restaurar automático
+            </button>
+          )}
+        </div>
+
+        <textarea
+          value={carimbo || ""}
+          onChange={(e) => handleCarimboChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
+          placeholder="O carimbo será gerado automaticamente..."
+        />
+
+        <p className="text-xs text-gray-500">
+          Este texto será usado como justificativa da despesa. Edite se necessário.
+        </p>
+      </div>
     </div>
   );
 }

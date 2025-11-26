@@ -1,506 +1,419 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { PreviewCalculo } from "../PreviewCalculo";
-import { Plus, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   ParametrosClasseV,
-  ItemMunicao,
   ItemArmamento,
+  TipoArmamento,
+  ARMAMENTOS,
   calcularClasseV,
-  VALORES_REFERENCIA_MUNICOES,
-  VALORES_REFERENCIA_MEM,
+  listarTodosArmamentos,
+  getCustoDiaEfetivo,
 } from "@/lib/calculos/classeV";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
+import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
 
 interface FormularioClasseVProps {
   value: ParametrosClasseV | null;
   onChange: (params: HandleParametrosChange) => void;
+  operacao: OperacaoWithEfetivo;
+  userOm: UserOM | null;
 }
 
-export function FormularioClasseV({ value, onChange }: FormularioClasseVProps) {
-  const [params, setParams] = useState<ParametrosClasseV>(
-    value || {
-      tipoCalculo: "MUNICOES",
-      municoes: [],
-      armamentos: [],
-    }
+export function FormularioClasseV({
+  value,
+  onChange,
+  operacao,
+  userOm,
+}: FormularioClasseVProps) {
+  // Calcular dias totais da operação
+  const diasTotaisOperacao = useMemo(() => {
+    const inicio = new Date(operacao.dataInicio);
+    const final = new Date(operacao.dataFinal);
+    const diffTime = Math.abs(final.getTime() - inicio.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
+  }, [operacao.dataInicio, operacao.dataFinal]);
+
+  const [armamentos, setArmamentos] = useState<ItemArmamento[]>(
+    value?.armamentos || []
   );
 
   const [valorTotal, setValorTotal] = useState<number | null>(null);
-  const [detalhes, setDetalhes] = useState<string | null>(null);
-
-  // Estado para novo item de munição
-  const [novaMunicao, setNovaMunicao] = useState<ItemMunicao>({
-    tipo: "",
-    quantidade: 0,
-    valorUnitario: 0,
-  });
+  const [carimbo, setCarimbo] = useState<string>("");
+  const [carimboEditadoManualmente, setCarimboEditadoManualmente] = useState(false);
 
   // Estado para novo item de armamento
-  const [novoArmamento, setNovoArmamento] = useState<ItemArmamento>({
-    tipo: "",
-    quantidade: 0,
-    valorMEM: 0,
-  });
+  const [tipoArmamentoSelecionado, setTipoArmamentoSelecionado] =
+    useState<TipoArmamento | null>(null);
+  const [quantidade, setQuantidade] = useState(1);
+  const [diasUso, setDiasUso] = useState(0);
+  const [custoMntDia, setCustoMntDia] = useState<number>(0);
+
+  const armamentosDisponiveis = listarTodosArmamentos();
 
   useEffect(() => {
     calcular();
-  }, [params]);
+  }, [armamentos]);
 
   const calcular = () => {
-    const { tipoCalculo, municoes, armamentos } = params;
-
-    // Validar se há itens
-    const temMunicoes = municoes && municoes.length > 0;
-    const temArmamentos = armamentos && armamentos.length > 0;
-
-    if (tipoCalculo === "MUNICOES" && !temMunicoes) {
+    if (armamentos.length === 0) {
       setValorTotal(null);
-      setDetalhes(null);
-      return;
-    }
-
-    if (tipoCalculo === "ARMAMENTO" && !temArmamentos) {
-      setValorTotal(null);
-      setDetalhes(null);
-      return;
-    }
-
-    if (tipoCalculo === "AMBOS" && !temMunicoes && !temArmamentos) {
-      setValorTotal(null);
-      setDetalhes(null);
+      setCarimbo("");
       return;
     }
 
     try {
-      const resultado = calcularClasseV(params);
+      const resultado = calcularClasseV(
+        { armamentos },
+        userOm?.sigla,
+        operacao.nome
+      );
       setValorTotal(resultado.valorTotal);
-      setDetalhes(resultado.detalhamento);
+      setCarimbo(resultado.detalhamento);
+      setCarimboEditadoManualmente(false);
       onChange({
-        params,
+        params: { armamentos },
         valor: resultado.valorTotal,
         descricao: resultado.detalhamento,
       });
     } catch (error) {
       console.error("Erro no cálculo:", error);
       setValorTotal(null);
-      setDetalhes(null);
+      setCarimbo("");
     }
   };
 
-  const handleTipoCalculoChange = (
-    tipo: "MUNICOES" | "ARMAMENTO" | "AMBOS"
-  ) => {
-    setParams((prev) => ({ ...prev, tipoCalculo: tipo }));
+  const handleCarimboChange = (novoCarimbo: string) => {
+    setCarimbo(novoCarimbo);
+    setCarimboEditadoManualmente(true);
+    onChange({ params: { armamentos }, valor: valorTotal || 0, descricao: novoCarimbo });
   };
 
-  // Funções para Munições
-  const adicionarMunicao = () => {
-    if (
-      !novaMunicao.tipo ||
-      novaMunicao.quantidade <= 0 ||
-      novaMunicao.valorUnitario <= 0
-    ) {
-      return;
-    }
-
-    const novasMunicoes = [...(params.municoes || []), novaMunicao];
-    setParams((prev) => ({ ...prev, municoes: novasMunicoes }));
-    setNovaMunicao({ tipo: "", quantidade: 0, valorUnitario: 0 });
+  const handleResetCarimbo = () => {
+    setCarimboEditadoManualmente(false);
+    calcular();
   };
 
-  const removerMunicao = (index: number) => {
-    const novasMunicoes = params.municoes?.filter((_, i) => i !== index) || [];
-    setParams((prev) => ({ ...prev, municoes: novasMunicoes }));
-  };
-
-  const preencherMunicaoPadrao = (tipoMunicao: string) => {
-    const valorPadrao =
-      VALORES_REFERENCIA_MUNICOES[
-        tipoMunicao as keyof typeof VALORES_REFERENCIA_MUNICOES
-      ] || 0;
-    setNovaMunicao((prev) => ({
-      ...prev,
-      tipo: tipoMunicao.replace(/_/g, " "),
-      valorUnitario: valorPadrao,
-    }));
-  };
-
-  // Funções para Armamentos
   const adicionarArmamento = () => {
     if (
-      !novoArmamento.tipo ||
-      novoArmamento.quantidade <= 0 ||
-      novoArmamento.valorMEM <= 0
+      !tipoArmamentoSelecionado ||
+      quantidade <= 0 ||
+      diasUso <= 0 ||
+      custoMntDia <= 0
     ) {
       return;
     }
 
-    const novosArmamentos = [...(params.armamentos || []), novoArmamento];
-    setParams((prev) => ({ ...prev, armamentos: novosArmamentos }));
-    setNovoArmamento({ tipo: "", quantidade: 0, valorMEM: 0 });
+    if (diasUso > diasTotaisOperacao) {
+      alert(
+        `O número de dias não pode exceder ${diasTotaisOperacao} dias (duração da operação)`
+      );
+      return;
+    }
+
+    const armamentoPadrao = ARMAMENTOS[tipoArmamentoSelecionado];
+    const isCustomizado = custoMntDia !== armamentoPadrao.custoMntDiaOpMil;
+
+    const novoArmamento: ItemArmamento = {
+      tipoArmamento: tipoArmamentoSelecionado,
+      quantidade,
+      diasUso,
+      ...(isCustomizado && { custoMntDiaCustomizado: custoMntDia }),
+    };
+
+    setArmamentos([...armamentos, novoArmamento]);
+    resetFormulario();
+  };
+
+  const resetFormulario = () => {
+    setTipoArmamentoSelecionado(null);
+    setQuantidade(1);
+    setDiasUso(0);
+    setCustoMntDia(0);
+  };
+
+  const handleTipoArmamentoChange = (tipo: TipoArmamento | null) => {
+    setTipoArmamentoSelecionado(tipo);
+    if (tipo) {
+      setCustoMntDia(ARMAMENTOS[tipo].custoMntDiaOpMil);
+    } else {
+      setCustoMntDia(0);
+    }
   };
 
   const removerArmamento = (index: number) => {
-    const novosArmamentos =
-      params.armamentos?.filter((_, i) => i !== index) || [];
-    setParams((prev) => ({ ...prev, armamentos: novosArmamentos }));
+    setArmamentos(armamentos.filter((_, i) => i !== index));
   };
 
-  const preencherArmamentoPadrao = (tipoArmamento: string) => {
-    const valorPadrao =
-      VALORES_REFERENCIA_MEM[
-        tipoArmamento as keyof typeof VALORES_REFERENCIA_MEM
-      ] || 0;
-    setNovoArmamento((prev) => ({
-      ...prev,
-      tipo: tipoArmamento.replace(/_/g, " "),
-      valorMEM: valorPadrao,
-    }));
+  const calcularCustoItem = (item: ItemArmamento): number => {
+    const custoDia = getCustoDiaEfetivo(item);
+    return item.quantidade * custoDia * item.diasUso;
   };
+
+  const armamentoSelecionadoInfo = tipoArmamentoSelecionado
+    ? ARMAMENTOS[tipoArmamentoSelecionado]
+    : null;
 
   return (
     <div className="space-y-4">
-      {/* Seletor de tipo de cálculo */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Tipo de Cálculo <span className="text-red-500">*</span>
-        </label>
-        <div className="grid grid-cols-3 gap-3">
-          <button
-            type="button"
-            onClick={() => handleTipoCalculoChange("MUNICOES")}
-            className={`px-4 py-3 rounded-md border-2 text-sm font-medium transition-all ${
-              params.tipoCalculo === "MUNICOES"
-                ? "border-green-600 bg-green-50 text-green-700"
-                : "border-gray-300 hover:border-gray-400"
-            }`}
-          >
-            Munições
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTipoCalculoChange("ARMAMENTO")}
-            className={`px-4 py-3 rounded-md border-2 text-sm font-medium transition-all ${
-              params.tipoCalculo === "ARMAMENTO"
-                ? "border-green-600 bg-green-50 text-green-700"
-                : "border-gray-300 hover:border-gray-400"
-            }`}
-          >
-            Armamento
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTipoCalculoChange("AMBOS")}
-            className={`px-4 py-3 rounded-md border-2 text-sm font-medium transition-all ${
-              params.tipoCalculo === "AMBOS"
-                ? "border-green-600 bg-green-50 text-green-700"
-                : "border-gray-300 hover:border-gray-400"
-            }`}
-          >
-            Ambos
-          </button>
-        </div>
-      </div>
+      {/* Lista de armamentos adicionados */}
+      {armamentos.length > 0 && (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Armamentos Adicionados
+          </label>
+          {armamentos.map((item, index) => {
+            const armamento = ARMAMENTOS[item.tipoArmamento];
+            const custoDia = getCustoDiaEfetivo(item);
+            const custoItem = calcularCustoItem(item);
+            const isCustomizado = item.custoMntDiaCustomizado !== undefined;
 
-      {/* Seção de Munições */}
-      {(params.tipoCalculo === "MUNICOES" ||
-        params.tipoCalculo === "AMBOS") && (
-        <div className="border-t pt-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Munições</h3>
-
-          {/* Lista de munições adicionadas */}
-          {params.municoes && params.municoes.length > 0 && (
-            <div className="space-y-2 mb-3">
-              {params.municoes.map((municao, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between bg-gray-50 p-2 rounded border"
-                >
-                  <div className="flex-1 text-sm">
-                    <span className="font-medium">{municao.tipo}</span>
-                    <span className="text-gray-600 ml-2">
-                      {municao.quantidade} un × R${" "}
-                      {municao.valorUnitario.toFixed(2)} = R${" "}
-                      {(
-                        municao.quantidade * municao.valorUnitario
-                      ).toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
+            return (
+              <div
+                key={index}
+                className="bg-gray-50 border border-gray-200 rounded-md p-3"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                        {armamento.categoria}
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900">
+                        R$ {custoItem.toFixed(2)}
+                      </span>
+                      {isCustomizado && (
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          Customizado
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      <p className="font-medium">
+                        {item.quantidade}x {armamento.nome}
+                      </p>
+                      <p>
+                        R$ {custoDia.toFixed(2)}/dia × {item.diasUso} dias
+                      </p>
+                    </div>
                   </div>
+
                   <button
                     type="button"
-                    onClick={() => removerMunicao(index)}
+                    onClick={() => removerArmamento(index)}
                     className="ml-2 p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                    title="Remover armamento"
                   >
-                    <X className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Formulário para adicionar munição */}
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-3">
-            <p className="text-sm font-medium text-blue-900">
-              Adicionar Munição
-            </p>
-
-            {/* Botões de munição padrão */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => preencherMunicaoPadrao("7.62MM")}
-                className="px-2 py-1 text-xs bg-white border border-blue-300 rounded hover:bg-blue-100 transition-colors"
-              >
-                7.62mm
-              </button>
-              <button
-                type="button"
-                onClick={() => preencherMunicaoPadrao("5.56MM")}
-                className="px-2 py-1 text-xs bg-white border border-blue-300 rounded hover:bg-blue-100 transition-colors"
-              >
-                5.56mm
-              </button>
-              <button
-                type="button"
-                onClick={() => preencherMunicaoPadrao("9MM")}
-                className="px-2 py-1 text-xs bg-white border border-blue-300 rounded hover:bg-blue-100 transition-colors"
-              >
-                9mm
-              </button>
-              <button
-                type="button"
-                onClick={() => preencherMunicaoPadrao("CAL_12")}
-                className="px-2 py-1 text-xs bg-white border border-blue-300 rounded hover:bg-blue-100 transition-colors"
-              >
-                Cal 12
-              </button>
-              <button
-                type="button"
-                onClick={() => preencherMunicaoPadrao("GRANADA_40MM")}
-                className="px-2 py-1 text-xs bg-white border border-blue-300 rounded hover:bg-blue-100 transition-colors"
-              >
-                Granada 40mm
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2">
-              <input
-                type="text"
-                value={novaMunicao.tipo}
-                onChange={(e) =>
-                  setNovaMunicao((prev) => ({ ...prev, tipo: e.target.value }))
-                }
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
-                placeholder="Tipo da munição (ex: 7,62mm)"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={novaMunicao.quantidade || ""}
-                  onChange={(e) =>
-                    setNovaMunicao((prev) => ({
-                      ...prev,
-                      quantidade: parseInt(e.target.value) || 0,
-                    }))
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
-                  placeholder="Quantidade"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={novaMunicao.valorUnitario || ""}
-                  onChange={(e) =>
-                    setNovaMunicao((prev) => ({
-                      ...prev,
-                      valorUnitario: parseFloat(e.target.value) || 0,
-                    }))
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
-                  placeholder="Valor unitário (R$)"
-                />
               </div>
-              <button
-                type="button"
-                onClick={adicionarMunicao}
-                disabled={
-                  !novaMunicao.tipo ||
-                  novaMunicao.quantidade <= 0 ||
-                  novaMunicao.valorUnitario <= 0
-                }
-                className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Adicionar Munição
-              </button>
-            </div>
-          </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Seção de Armamento */}
-      {(params.tipoCalculo === "ARMAMENTO" ||
-        params.tipoCalculo === "AMBOS") && (
-        <div className="border-t pt-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">
-            Armamento (Manutenção - 8% MEM anual)
-          </h3>
+      {/* Formulário para adicionar armamento */}
+      <div className="bg-amber-50 border border-amber-200 rounded-md p-4 space-y-3">
+        <p className="text-sm font-semibold text-amber-900">
+          Adicionar Armamento
+        </p>
 
-          {/* Lista de armamentos adicionados */}
-          {params.armamentos && params.armamentos.length > 0 && (
-            <div className="space-y-2 mb-3">
-              {params.armamentos.map((armamento, index) => {
-                const valorTotalMEM = armamento.quantidade * armamento.valorMEM;
-                const custoManutencao = valorTotalMEM * 0.08;
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between bg-gray-50 p-2 rounded border"
-                  >
-                    <div className="flex-1 text-sm">
-                      <span className="font-medium">{armamento.tipo}</span>
-                      <span className="text-gray-600 ml-2">
-                        {armamento.quantidade} un × R${" "}
-                        {armamento.valorMEM.toLocaleString("pt-BR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        × 8% = R${" "}
-                        {custoManutencao.toLocaleString("pt-BR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removerArmamento(index)}
-                      className="ml-2 p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                );
-              })}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Tipo de Armamento <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={tipoArmamentoSelecionado || ""}
+            onChange={(e) =>
+              handleTipoArmamentoChange(
+                (e.target.value as TipoArmamento) || null
+              )
+            }
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
+          >
+            <option value="">Selecione um armamento</option>
+            <optgroup label="Armamento Leve (Armt L)">
+              {armamentosDisponiveis
+                .filter((a) => a.info.categoria === "ARMT_L")
+                .map((a) => (
+                  <option key={a.tipo} value={a.tipo}>
+                    {a.info.nome} - R$ {a.info.custoMntDiaOpMil.toFixed(2)}/dia
+                  </option>
+                ))}
+            </optgroup>
+            <optgroup label="Armamento Pesado (Armt P)">
+              {armamentosDisponiveis
+                .filter((a) => a.info.categoria === "ARMT_P")
+                .map((a) => (
+                  <option key={a.tipo} value={a.tipo}>
+                    {a.info.nome} - R$ {a.info.custoMntDiaOpMil.toFixed(2)}/dia
+                  </option>
+                ))}
+            </optgroup>
+            <optgroup label="IODCT">
+              {armamentosDisponiveis
+                .filter((a) => a.info.categoria === "IODCT")
+                .map((a) => (
+                  <option key={a.tipo} value={a.tipo}>
+                    {a.info.nome} - R$ {a.info.custoMntDiaOpMil.toFixed(2)}/dia
+                  </option>
+                ))}
+            </optgroup>
+            <optgroup label="DQBRN">
+              {armamentosDisponiveis
+                .filter((a) => a.info.categoria === "DQBRN")
+                .map((a) => (
+                  <option key={a.tipo} value={a.tipo}>
+                    {a.info.nome} - R$ {a.info.custoMntDiaOpMil.toFixed(2)}/dia
+                  </option>
+                ))}
+            </optgroup>
+          </select>
+        </div>
+
+        {armamentoSelecionadoInfo && (
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Custo Manutenção/Dia (R$) <span className="text-red-500">*</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={custoMntDia || ""}
+                onChange={(e) =>
+                  setCustoMntDia(parseFloat(e.target.value) || 0)
+                }
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                placeholder="0.00"
+              />
+              {custoMntDia !== armamentoSelecionadoInfo.custoMntDiaOpMil && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCustoMntDia(armamentoSelecionadoInfo.custoMntDiaOpMil)
+                  }
+                  className="text-xs text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
+                >
+                  Restaurar padrão
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Valor padrão: R${" "}
+              {armamentoSelecionadoInfo.custoMntDiaOpMil.toFixed(2)}/dia
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Quantidade <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={quantidade || ""}
+              onChange={(e) => setQuantidade(parseInt(e.target.value) || 0)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
+              placeholder="1"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Dias de uso <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              max={diasTotaisOperacao}
+              step="1"
+              value={diasUso || ""}
+              onChange={(e) => {
+                const valor = parseInt(e.target.value) || 0;
+                setDiasUso(Math.min(valor, diasTotaisOperacao));
+              }}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
+              placeholder={`Máx: ${diasTotaisOperacao}`}
+            />
+          </div>
+        </div>
+
+        {armamentoSelecionadoInfo &&
+          quantidade > 0 &&
+          diasUso > 0 &&
+          custoMntDia > 0 && (
+            <div className="bg-white rounded p-2 text-xs text-gray-600">
+              <p>
+                <strong>Custo estimado:</strong> {quantidade} × R${" "}
+                {custoMntDia.toFixed(2)} × {diasUso} dias ={" "}
+                <span className="font-semibold text-green-700">
+                  R$ {(quantidade * custoMntDia * diasUso).toFixed(2)}
+                </span>
+                {custoMntDia !== armamentoSelecionadoInfo.custoMntDiaOpMil && (
+                  <span className="ml-2 text-amber-600">
+                    (custo customizado)
+                  </span>
+                )}
+              </p>
             </div>
           )}
 
-          {/* Formulário para adicionar armamento */}
-          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 space-y-3">
-            <p className="text-sm font-medium text-amber-900">
-              Adicionar Armamento
-            </p>
-
-            {/* Botões de armamento padrão */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => preencherArmamentoPadrao("FUZIL_IMBEL_762")}
-                className="px-2 py-1 text-xs bg-white border border-amber-300 rounded hover:bg-amber-100 transition-colors"
-              >
-                Fuzil 7.62
-              </button>
-              <button
-                type="button"
-                onClick={() => preencherArmamentoPadrao("CARABINA_556")}
-                className="px-2 py-1 text-xs bg-white border border-amber-300 rounded hover:bg-amber-100 transition-colors"
-              >
-                Carabina 5.56
-              </button>
-              <button
-                type="button"
-                onClick={() => preencherArmamentoPadrao("PISTOLA_TAURUS_9MM")}
-                className="px-2 py-1 text-xs bg-white border border-amber-300 rounded hover:bg-amber-100 transition-colors"
-              >
-                Pistola 9mm
-              </button>
-              <button
-                type="button"
-                onClick={() => preencherArmamentoPadrao("ESPINGARDA_CAL12")}
-                className="px-2 py-1 text-xs bg-white border border-amber-300 rounded hover:bg-amber-100 transition-colors"
-              >
-                Espingarda Cal 12
-              </button>
-              <button
-                type="button"
-                onClick={() => preencherArmamentoPadrao("METRALHADORA_762")}
-                className="px-2 py-1 text-xs bg-white border border-amber-300 rounded hover:bg-amber-100 transition-colors"
-              >
-                Metralhadora
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2">
-              <input
-                type="text"
-                value={novoArmamento.tipo}
-                onChange={(e) =>
-                  setNovoArmamento((prev) => ({
-                    ...prev,
-                    tipo: e.target.value,
-                  }))
-                }
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
-                placeholder="Tipo do armamento (ex: Fuzil IMBEL 7.62)"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={novoArmamento.quantidade || ""}
-                  onChange={(e) =>
-                    setNovoArmamento((prev) => ({
-                      ...prev,
-                      quantidade: parseInt(e.target.value) || 0,
-                    }))
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
-                  placeholder="Quantidade"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={novoArmamento.valorMEM || ""}
-                  onChange={(e) =>
-                    setNovoArmamento((prev) => ({
-                      ...prev,
-                      valorMEM: parseFloat(e.target.value) || 0,
-                    }))
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
-                  placeholder="Valor MEM (R$)"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={adicionarArmamento}
-                disabled={
-                  !novoArmamento.tipo ||
-                  novoArmamento.quantidade <= 0 ||
-                  novoArmamento.valorMEM <= 0
-                }
-                className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Adicionar Armamento
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        <button
+          type="button"
+          onClick={adicionarArmamento}
+          disabled={
+            !tipoArmamentoSelecionado ||
+            quantidade <= 0 ||
+            diasUso <= 0 ||
+            custoMntDia <= 0
+          }
+          className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Adicionar Armamento
+        </button>
+      </div>
 
       {/* Preview do cálculo */}
-      <PreviewCalculo valorTotal={valorTotal} carimbo={detalhes} />
+      <PreviewCalculo valorTotal={valorTotal} />
+
+      {/* Carimbo editável */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">
+            Carimbo
+          </label>
+          {carimboEditadoManualmente && (
+            <button
+              type="button"
+              onClick={handleResetCarimbo}
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              Restaurar automático
+            </button>
+          )}
+        </div>
+
+        <textarea
+          value={carimbo || ""}
+          onChange={(e) => handleCarimboChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
+          placeholder="O carimbo será gerado automaticamente..."
+        />
+
+        <p className="text-xs text-gray-500">
+          Este texto será usado como justificativa da despesa. Edite se necessário.
+        </p>
+      </div>
     </div>
   );
 }

@@ -35,6 +35,13 @@ export async function GET(
             postoGraduacao: true,
             nomeCompleto: true,
             nomeGuerra: true,
+            role: true,
+          },
+        },
+        omNivel: {
+          select: {
+            nome: true,
+            sigla: true,
           },
         },
       },

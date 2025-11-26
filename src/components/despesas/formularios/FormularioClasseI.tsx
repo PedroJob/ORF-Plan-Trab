@@ -9,7 +9,7 @@ import {
 import { VALORES_REFEICAO, MAX_DIAS_ETAPA } from "@/lib/constants";
 import { Tipo } from "@prisma/client";
 import { HandleParametrosChange as HandleParametrosChange } from "../ModalCriarDespesa";
-import type { OperacaoWithEfetivo } from "@/types/despesas";
+import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
 
 export type TipoRefeicao = "QR" | "QS";
 
@@ -25,6 +25,7 @@ interface FormularioClasseIProps {
   tipo: Tipo;
   onChange: (params: HandleParametrosChange) => void;
   operacao: OperacaoWithEfetivo;
+  userOm: UserOM | null;
 }
 
 export function FormularioClasseI({
@@ -32,6 +33,7 @@ export function FormularioClasseI({
   tipo,
   onChange,
   operacao,
+  userOm,
 }: FormularioClasseIProps) {
   const calcularDias = () => {
     const inicio = new Date(operacao.dataInicio);
@@ -51,7 +53,9 @@ export function FormularioClasseI({
   );
 
   const [valorTotal, setValorTotal] = useState<number | null>(null);
-  const [detalhes, setDetalhes] = useState<string | null>(null);
+  const [carimbo, setCarimbo] = useState<string>("");
+  const [carimboEditadoManualmente, setCarimboEditadoManualmente] =
+    useState(false);
 
   useEffect(() => {
     calcular();
@@ -62,7 +66,7 @@ export function FormularioClasseI({
 
     if (efetivo <= 0 || diasOperacao <= 0) {
       setValorTotal(null);
-      setDetalhes(null);
+      setCarimbo("");
       return;
     }
 
@@ -86,23 +90,50 @@ export function FormularioClasseI({
     }
 
     const detalhesCalculo = gerarCarimboCompleto({
-      destinacao: `Destinado à ${operacao.nome}`,
-      descricaoOperacao: `Aquisição de gêneros alimentícios (${tipoRefeicao})`,
+      unidade: userOm?.sigla || "OM não identificada",
       nomeOperacao: operacao.nome,
+      efetivo,
       resultado,
       tipoRefeicao,
     });
 
     setValorTotal(resultado.total);
-    setDetalhes(detalhesCalculo);
+
+    // Sempre regenerar carimbo dos parâmetros
+    setCarimbo(detalhesCalculo);
+    setCarimboEditadoManualmente(false);
+
     onChange({ params, valor: resultado.total, descricao: detalhesCalculo });
-  }, [params, onChange, operacao.nome, tipo]);
+  }, [params, onChange, operacao.nome, tipo, userOm]);
 
   const handleChange = (
     field: keyof ParametrosClasseI,
     value: string | number
   ) => {
-    setParams((prev) => ({ ...prev, [field]: value }));
+    let finalValue = value;
+
+    if (field === "diasOperacao" && typeof value === "number") {
+      const maxDias = calcularDias();
+      finalValue = Math.min(value, maxDias);
+    }
+
+    setParams((prev) => ({ ...prev, [field]: finalValue }));
+  };
+
+  const handleCarimboChange = (novoCarimbo: string) => {
+    setCarimbo(novoCarimbo);
+    setCarimboEditadoManualmente(true);
+
+    onChange({
+      params,
+      valor: valorTotal || 0,
+      descricao: novoCarimbo,
+    });
+  };
+
+  const handleResetCarimbo = () => {
+    setCarimboEditadoManualmente(false);
+    calcular();
   };
 
   return (
@@ -115,6 +146,7 @@ export function FormularioClasseI({
           <input
             type="number"
             min="1"
+            step="1"
             value={params.efetivo || ""}
             onChange={(e) =>
               handleChange("efetivo", parseInt(e.target.value) || 0)
@@ -130,6 +162,8 @@ export function FormularioClasseI({
           <input
             type="number"
             min="1"
+            max={calcularDias()}
+            step="1"
             value={params.diasOperacao || ""}
             onChange={(e) =>
               handleChange("diasOperacao", parseInt(e.target.value) || 0)
@@ -142,10 +176,42 @@ export function FormularioClasseI({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Número de etapas intermediárias{" "}
+          Número de refeições intermediárias{" "}
           <span className="text-red-500">*</span>
         </label>
         <div className="flex gap-4">
+          <label className="flex items-center">
+            <input
+              type="radio"
+              name="numeroRefIntermediarias"
+              value="0"
+              checked={params.numeroRefIntermediarias === 0}
+              onChange={(e) =>
+                handleChange(
+                  "numeroRefIntermediarias",
+                  parseInt(e.target.value)
+                )
+              }
+              className="mr-2"
+            />
+            0
+          </label>
+          <label className="flex items-center">
+            <input
+              type="radio"
+              name="numeroRefIntermediarias"
+              value="1"
+              checked={params.numeroRefIntermediarias === 1}
+              onChange={(e) =>
+                handleChange(
+                  "numeroRefIntermediarias",
+                  parseInt(e.target.value)
+                )
+              }
+              className="mr-2"
+            />
+            1
+          </label>
           <label className="flex items-center">
             <input
               type="radio"
@@ -160,7 +226,7 @@ export function FormularioClasseI({
               }
               className="mr-2"
             />
-            <span>2 etapas</span>
+            2
           </label>
           <label className="flex items-center">
             <input
@@ -176,12 +242,41 @@ export function FormularioClasseI({
               }
               className="mr-2"
             />
-            <span>3 etapas</span>
+            3
           </label>
         </div>
       </div>
 
-      <PreviewCalculo valorTotal={valorTotal} carimbo={detalhes} />
+      <PreviewCalculo valorTotal={valorTotal} />
+
+      {/* Carimbo editável */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">
+            Carimbo
+          </label>
+          {carimboEditadoManualmente && (
+            <button
+              type="button"
+              onClick={handleResetCarimbo}
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              Restaurar automático
+            </button>
+          )}
+        </div>
+
+        <textarea
+          value={carimbo || ""}
+          onChange={(e) => handleCarimboChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
+          placeholder="O carimbo será gerado automaticamente..."
+        />
+
+        <p className="text-xs text-gray-500">
+          Este texto será usado como justificativa da despesa. Edite se necessário.
+        </p>
+      </div>
     </div>
   );
 }

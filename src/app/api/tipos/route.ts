@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       where: { id: currentUser.userId },
     });
 
-    if (!user || !['CMT_OM', 'CMT_BRIGADA', 'CMT_CMA', 'SUPER_ADMIN'].includes(user.role)) {
+    if (!user || !['S4', 'COMANDANTE', 'SUPER_ADMIN'].includes(user.role)) {
       return NextResponse.json(
         { error: 'Sem permissão para criar tipos' },
         { status: 403 }

@@ -13,11 +13,13 @@ async function main() {
   await prisma.anotacao.deleteMany();
   await prisma.documentoReferencia.deleteMany();
   await prisma.despesaOM.deleteMany();
+  await prisma.despesaNatureza.deleteMany();
   await prisma.despesa.deleteMany();
   await prisma.tipo.deleteMany();
   await prisma.classe.deleteMany();
   await prisma.naturezaDespesa.deleteMany();
   await prisma.planoTrabalho.deleteMany();
+  await prisma.operacaoOM.deleteMany();
   await prisma.operacao.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organizacaoMilitar.deleteMany();
@@ -109,40 +111,7 @@ async function main() {
   });
   console.log("  ✓ Super Admin criado (admin@eb.mil.br / admin123)");
 
-  const cmtCmaPassword = await bcrypt.hash("senha123", 10);
-  const cmtCma = await prisma.user.create({
-    data: {
-      email: "cmt.cma@eb.mil.br",
-      passwordHash: cmtCmaPassword,
-      nomeCompleto: "Ricardo Augusto do Amaral Peixoto",
-      nomeGuerra: "Peixoto",
-      postoGraduacao: "Gen Div",
-      telefone: "(92) 3659-1174",
-      role: "CMT_CMA",
-      isActive: true,
-      omId: cma.id,
-    },
-  });
-  console.log("  ✓ Comandante CMA criado (cmt.cma@eb.mil.br / senha123)");
-
-  const cmtBrigadaPassword = await bcrypt.hash("senha123", 10);
-  const cmtBrigada = await prisma.user.create({
-    data: {
-      email: "cmt.brigada@eb.mil.br",
-      passwordHash: cmtBrigadaPassword,
-      nomeCompleto: "João da Silva Santos",
-      nomeGuerra: "Silva",
-      postoGraduacao: "Gen Bda",
-      telefone: "(92) 3234-5678",
-      role: "CMT_BRIGADA",
-      isActive: true,
-      omId: brigada.id,
-    },
-  });
-  console.log(
-    "  ✓ Comandante Brigada criado (cmt.brigada@eb.mil.br / senha123)"
-  );
-
+  // Comandante do 6º BEC
   const cmtBecPassword = await bcrypt.hash("senha123", 10);
   const cmtBec = await prisma.user.create({
     data: {
@@ -152,13 +121,31 @@ async function main() {
       nomeGuerra: "Oliveira",
       postoGraduacao: "Cel",
       telefone: "(92) 3234-1111",
-      role: "CMT_OM",
+      role: "COMANDANTE",
       isActive: true,
       omId: bec.id,
     },
   });
   console.log("  ✓ Comandante 6º BEC criado (cmt.bec@eb.mil.br / senha123)");
 
+  // S4 do 6º BEC (responsável por aprovações)
+  const s4BecPassword = await bcrypt.hash("senha123", 10);
+  const s4Bec = await prisma.user.create({
+    data: {
+      email: "s4.bec@eb.mil.br",
+      passwordHash: s4BecPassword,
+      nomeCompleto: "Fernando Souza Lima",
+      nomeGuerra: "Souza",
+      postoGraduacao: "Maj",
+      telefone: "(92) 3234-3333",
+      role: "S4",
+      isActive: true,
+      omId: bec.id,
+    },
+  });
+  console.log("  ✓ S4 6º BEC criado (s4.bec@eb.mil.br / senha123)");
+
+  // Integrante do 6º BEC
   const integrantePassword = await bcrypt.hash("senha123", 10);
   const integrante = await prisma.user.create({
     data: {
@@ -168,12 +155,29 @@ async function main() {
       nomeGuerra: "Pereira",
       postoGraduacao: "Cap",
       telefone: "(92) 3234-2222",
-      role: "INTEGRANTE_OM",
+      role: "INTEGRANTE",
       isActive: true,
       omId: bec.id,
     },
   });
   console.log("  ✓ Integrante OM criado (integrante@eb.mil.br / senha123)");
+
+  // S4 do 7º BIS
+  const s4BisPassword = await bcrypt.hash("senha123", 10);
+  const s4Bis = await prisma.user.create({
+    data: {
+      email: "s4.bis@eb.mil.br",
+      passwordHash: s4BisPassword,
+      nomeCompleto: "Marcos Antônio Costa",
+      nomeGuerra: "Costa",
+      postoGraduacao: "Maj",
+      telefone: "(92) 3234-4444",
+      role: "S4",
+      isActive: true,
+      omId: bis.id,
+    },
+  });
+  console.log("  ✓ S4 7º BIS criado (s4.bis@eb.mil.br / senha123)");
 
   // Criar naturezas de despesa (apenas as 2 válidas)
   console.log("\n💰 Criando naturezas de despesa...");
@@ -324,16 +328,6 @@ async function main() {
     ],
   });
 
-  // Classe II - Manutenção de Material de Intendência
-  await prisma.tipo.create({
-    data: {
-      nome: "Manutenção de Material de Intendência",
-      classeId: classeII.id,
-      isCombustivel: false,
-      isCriavelUsuario: true,
-    },
-  });
-
   // Classe III - Combustíveis (não criáveis pelo usuário)
   await prisma.tipo.createMany({
     data: [
@@ -349,29 +343,7 @@ async function main() {
         isCombustivel: true,
         isCriavelUsuario: false,
       },
-      {
-        nome: "QAV (Querosene de Aviação)",
-        classeId: classeIII.id,
-        isCombustivel: true,
-        isCriavelUsuario: false,
-      },
-      {
-        nome: "Lubrificantes",
-        classeId: classeIII.id,
-        isCombustivel: false,
-        isCriavelUsuario: true,
-      },
     ],
-  });
-
-  // Classe IV - Material de Construção
-  await prisma.tipo.create({
-    data: {
-      nome: "Material de Construção",
-      classeId: classeIV.id,
-      isCombustivel: false,
-      isCriavelUsuario: true,
-    },
   });
 
   // Classe V - Munição e Explosivos
@@ -488,16 +460,6 @@ async function main() {
     ],
   });
 
-  // Classe X - Material Não Classificado
-  await prisma.tipo.create({
-    data: {
-      nome: "Material Não Classificado",
-      classeId: classeX.id,
-      isCombustivel: false,
-      isCriavelUsuario: true,
-    },
-  });
-
   console.log("  ✓ Tipos de despesa criados para todas as classes");
 
   // Criar operação de exemplo
@@ -520,9 +482,36 @@ async function main() {
       observacoes:
         'As memórias de cálculo detalhadas e parametrizadas das despesas custeadas serão mantidas em arquivos próprios. O bem e/ou serviço requisitado está de acordo com a "Descrição" da AO e com a "Caracterização" do PO do Cadastro de Ações do SIOP.',
       omId: cma.id,
+      valorLimiteTotal: 1000000.0, // R$ 1.000.000,00 total para a operação
     },
   });
   console.log("  ✓ Operação CATRIMANI II criada");
+
+  // Criar OMs participantes da operação com seus limites de valor
+  console.log("\n🏢 Criando OMs participantes da operação...");
+
+  await prisma.operacaoOM.createMany({
+    data: [
+      {
+        operacaoId: operacao.id,
+        omId: bec.id,
+        valorLimite: 400000.0, // R$ 400.000,00 para o 6º BEC
+      },
+      {
+        operacaoId: operacao.id,
+        omId: bis.id,
+        valorLimite: 350000.0, // R$ 350.000,00 para o 7º BIS
+      },
+      {
+        operacaoId: operacao.id,
+        omId: rm12.id,
+        valorLimite: 250000.0, // R$ 250.000,00 para a 12ª RM
+      },
+    ],
+  });
+  console.log("  ✓ 6º BEC participando com limite R$ 400.000,00");
+  console.log("  ✓ 7º BIS participando com limite R$ 350.000,00");
+  console.log("  ✓ 12ª RM participando com limite R$ 250.000,00");
 
   // Log de auditoria
   await prisma.auditoriaLog.create({
@@ -544,21 +533,25 @@ async function main() {
   console.log("  Email: admin@eb.mil.br");
   console.log("  Senha: admin123");
   console.log("");
-  console.log("Comandante CMA:");
-  console.log("  Email: cmt.cma@eb.mil.br");
-  console.log("  Senha: senha123");
-  console.log("");
-  console.log("Comandante Brigada:");
-  console.log("  Email: cmt.brigada@eb.mil.br");
-  console.log("  Senha: senha123");
-  console.log("");
   console.log("Comandante 6º BEC:");
   console.log("  Email: cmt.bec@eb.mil.br");
   console.log("  Senha: senha123");
+  console.log("  Role: COMANDANTE");
+  console.log("");
+  console.log("S4 6º BEC (pode aprovar planos):");
+  console.log("  Email: s4.bec@eb.mil.br");
+  console.log("  Senha: senha123");
+  console.log("  Role: S4");
   console.log("");
   console.log("Integrante OM:");
   console.log("  Email: integrante@eb.mil.br");
   console.log("  Senha: senha123");
+  console.log("  Role: INTEGRANTE");
+  console.log("");
+  console.log("S4 7º BIS:");
+  console.log("  Email: s4.bis@eb.mil.br");
+  console.log("  Senha: senha123");
+  console.log("  Role: S4");
   console.log("");
   console.log("═══════════════════════════════════════════════");
 }

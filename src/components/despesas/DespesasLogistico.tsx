@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Loader2, AlertCircle, Edit } from "lucide-react";
 import { ModalCriarDespesa } from "./ModalCriarDespesa";
-import type { OMSelect, OperacaoWithEfetivo } from "@/types/despesas";
+import type { OMSelect, OperacaoWithEfetivo, UserOM } from "@/types/despesas";
 
 /**
  * Serialized API response type for Despesa with relations
@@ -12,16 +12,19 @@ import type { OMSelect, OperacaoWithEfetivo } from "@/types/despesas";
 interface Despesa {
   id: string;
   descricao: string;
+  parametros: unknown;
   valorCalculado: number;
   valorCombustivel: number | null;
   classe: {
+    id: string;
     nome: string;
     descricao: string;
   };
   tipo: {
+    id: string;
     nome: string;
     isCombustivel: boolean;
-  };
+  } | null;
   oms: {
     id: string;
     omId: string;
@@ -53,6 +56,7 @@ interface DespesasLogisticoProps {
   operacao: OperacaoWithEfetivo;
   canEdit: boolean;
   onRefresh?: () => void | Promise<void>;
+  userOm: UserOM | null;
 }
 
 export function DespesasLogistico({
@@ -61,11 +65,13 @@ export function DespesasLogistico({
   operacao,
   canEdit,
   onRefresh,
+  userOm,
 }: DespesasLogisticoProps) {
   const [loading, setLoading] = useState(true);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [despesaToEdit, setDespesaToEdit] = useState<any | null>(null);
 
   useEffect(() => {
     carregarDespesas();
@@ -92,6 +98,34 @@ export function DespesasLogistico({
     if (onRefresh) {
       await onRefresh();
     }
+  };
+
+  const handleEdit = (despesa: Despesa) => {
+    setDespesaToEdit({
+      id: despesa.id,
+      classeId: despesa.classe.id,
+      tipoId: despesa.tipo?.id || null,
+      descricao: despesa.descricao,
+      parametros: (despesa as any).parametros,
+      valorCalculado: Number(despesa.valorCalculado),
+      valorCombustivel: despesa.valorCombustivel
+        ? Number(despesa.valorCombustivel)
+        : null,
+      oms: despesa.oms.map((om) => ({
+        omId: om.omId,
+        percentual: Number(om.percentual),
+      })),
+      despesasNaturezas: despesa.despesasNaturezas.map((nat) => ({
+        naturezaId: nat.naturezaId,
+        percentual: Number(nat.percentual),
+      })),
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setDespesaToEdit(null);
   };
 
   const handleDelete = async (despesaId: string) => {
@@ -136,14 +170,29 @@ export function DespesasLogistico({
       (sum, d) => sum + Number(d.valorCalculado),
       0
     );
-    const totalCombustivel = despesas
-      .filter((d) => d.valorCombustivel !== null)
-      .reduce((sum, d) => sum + Number(d.valorCombustivel!), 0);
 
-    return { totalGeral, totalCombustivel };
+    // Separar combustível por tipo (Diesel e Gasolina)
+    let totalDiesel = 0;
+    let totalGasolina = 0;
+
+    despesas
+      .filter((d) => d.valorCombustivel !== null)
+      .forEach((d) => {
+        const params = d.parametros as { tipoCombustivel?: string } | null;
+        const tipoCombustivel = params?.tipoCombustivel;
+        const litros = Number(d.valorCombustivel!);
+
+        if (tipoCombustivel === "OD") {
+          totalDiesel += litros;
+        } else if (tipoCombustivel === "GAS") {
+          totalGasolina += litros;
+        }
+      });
+
+    return { totalGeral, totalDiesel, totalGasolina };
   };
 
-  const { totalGeral, totalCombustivel } = calcularTotais();
+  const { totalGeral, totalDiesel, totalGasolina } = calcularTotais();
 
   if (loading) {
     return (
@@ -216,10 +265,6 @@ export function DespesasLogistico({
                       )}
                     </div>
 
-                    <h4 className="font-medium text-gray-900 mb-2">
-                      {despesa.descricao}
-                    </h4>
-
                     <div className="grid grid-cols-2 gap-4 mb-3">
                       <div>
                         <p className="text-xs text-gray-500 mb-1">
@@ -248,7 +293,6 @@ export function DespesasLogistico({
                         </div>
                       )}
                     </div>
-
                     <div className="mb-3">
                       <p className="text-xs text-gray-500 mb-1">
                         Naturezas de Despesa
@@ -263,14 +307,18 @@ export function DespesasLogistico({
                               {rateio.natureza.codigo} - {rateio.natureza.nome}
                             </span>
                             <span className="font-medium text-gray-900">
-                              {Number(rateio.percentual).toFixed(2)}%
+                              R${" "}
+                              {Number(
+                                rateio.percentual * despesa.valorCalculado
+                              )}{" "}
+                              ({Number(rateio.percentual).toFixed(2)}%)
                             </span>
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    <div>
+                    <div className="mb-4">
                       <p className="text-xs text-gray-500 mb-1">
                         Rateio por OMs
                       </p>
@@ -284,27 +332,44 @@ export function DespesasLogistico({
                               {rateio.om.sigla} - {rateio.om.nome}
                             </span>
                             <span className="font-medium text-gray-900">
-                              {Number(rateio.percentual).toFixed(2)}%
+                              R${" "}
+                              {Number(
+                                rateio.percentual * despesa.valorCalculado
+                              )}{" "}
+                              ({Number(rateio.percentual).toFixed(2)}%)
                             </span>
                           </div>
                         ))}
                       </div>
                     </div>
+                    <p className="text-xs text-gray-500 ">Descrição</p>
+                    <h4 className="font-medium text-gray-900 my-2">
+                      {despesa.descricao}
+                    </h4>
                   </div>
 
                   {canEdit && (
-                    <button
-                      onClick={() => handleDelete(despesa.id)}
-                      disabled={deletingId === despesa.id}
-                      className="ml-4 p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Excluir despesa"
-                    >
-                      {deletingId === despesa.id ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-5 h-5" />
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2 ml-4">
+                      <button
+                        onClick={() => handleEdit(despesa)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                        title="Editar despesa"
+                      >
+                        <Edit className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(despesa.id)}
+                        disabled={deletingId === despesa.id}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Excluir despesa"
+                      >
+                        {deletingId === despesa.id ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -324,18 +389,35 @@ export function DespesasLogistico({
                 </p>
               </div>
 
-              {totalCombustivel > 0 && (
-                <div>
+              {(totalDiesel > 0 || totalGasolina > 0) && (
+                <div className="space-y-2">
                   <p className="text-xs text-green-700 mb-1">
                     Total de Combustível
                   </p>
-                  <p className="text-lg font-semibold text-green-800">
-                    {totalCombustivel.toLocaleString("pt-BR", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    L
-                  </p>
+                  {totalDiesel > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-green-600">Diesel:</span>
+                      <span className="text-sm font-semibold text-green-800">
+                        {totalDiesel.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        L
+                      </span>
+                    </div>
+                  )}
+                  {totalGasolina > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-green-600">Gasolina:</span>
+                      <span className="text-sm font-semibold text-green-800">
+                        {totalGasolina.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        L
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -347,11 +429,13 @@ export function DespesasLogistico({
       {canEdit && (
         <ModalCriarDespesa
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          onClose={handleCloseModal}
           planoId={planoId}
           oms={oms}
           operacao={operacao}
           onSuccess={handleDespesaSuccess}
+          despesaToEdit={despesaToEdit}
+          userOm={userOm}
         />
       )}
     </div>
