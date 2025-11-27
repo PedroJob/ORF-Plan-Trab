@@ -9,9 +9,9 @@ services:
     container_name: sisptrab-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: sisptrab_user
-      POSTGRES_PASSWORD: sisptrab_db123
-      POSTGRES_DB: sisptrab
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "${DB_PORT:-5432}:5432"
@@ -20,7 +20,7 @@ services:
     networks:
       - sisptrab-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sisptrab_user -d sisptrab"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,17 +31,18 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
     container_name: sisptrab-app
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://${DB_USER:-sisptrab}:${DB_PASSWORD:-sisptrab_password_change_in_production}@postgres:5432/${DB_NAME:-sisptrab}?schema=public
-      - JWT_SECRET=${JWT_SECRET:-change-this-to-a-secure-random-string-in-production}
-      - NEXT_PUBLIC_APP_URL=${APP_URL:-http://localhost:3000}
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_APP_URL: ${APP_URL}
+      APP_URL: ${APP_URL}
+      PORT: ${APP_PORT}
     ports:
       - "${APP_PORT:-3000}:3000"
     networks:
