@@ -14,9 +14,22 @@ export async function GET(
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
+    // Verificar se deve incluir despesas completas (para PDF)
+    const { searchParams } = new URL(request.url);
+    const incluirDespesas = searchParams.get('incluirDespesas') === 'true';
+
     const plano = await prisma.planoTrabalho.findUnique({
       where: { id },
       include: {
+        om: {
+          select: {
+            id: true,
+            nome: true,
+            sigla: true,
+            tipo: true,
+            codUG: true,
+          },
+        },
         operacao: {
           select: {
             id: true,
@@ -25,6 +38,9 @@ export async function GET(
             efetivoExt: true,
             dataInicio: true,
             dataFinal: true,
+            diasTotais: true,
+            finalidade: true,
+            motivacao: true,
             om: {
               select: {
                 id: true,
@@ -43,7 +59,46 @@ export async function GET(
             postoGraduacao: true,
           },
         },
-        despesas: {
+        despesas: incluirDespesas ? {
+          include: {
+            classe: {
+              select: {
+                nome: true,
+                descricao: true,
+              },
+            },
+            tipo: {
+              select: {
+                nome: true,
+                isCombustivel: true,
+              },
+            },
+            oms: {
+              include: {
+                om: {
+                  select: {
+                    id: true,
+                    nome: true,
+                    sigla: true,
+                    codUG: true,
+                  },
+                },
+              },
+            },
+            despesasNaturezas: {
+              include: {
+                natureza: {
+                  select: {
+                    id: true,
+                    codigo: true,
+                    nome: true,
+                    descricao: true,
+                  },
+                },
+              },
+            },
+          },
+        } : {
           select: {
             id: true,
             valorCalculado: true,

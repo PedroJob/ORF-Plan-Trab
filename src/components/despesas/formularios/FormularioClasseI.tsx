@@ -9,7 +9,7 @@ import {
 import { VALORES_REFEICAO, MAX_DIAS_ETAPA } from "@/lib/constants";
 import { Tipo } from "@prisma/client";
 import { HandleParametrosChange as HandleParametrosChange } from "../ModalCriarDespesa";
-import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
+import type { OperacaoWithEfetivo, UserOM, NaturezaSelect, RateioNatureza } from "@/types/despesas";
 
 export type TipoRefeicao = "QR" | "QS";
 
@@ -26,6 +26,9 @@ interface FormularioClasseIProps {
   onChange: (params: HandleParametrosChange) => void;
   operacao: OperacaoWithEfetivo;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
+  naturezas: NaturezaSelect[];
+  rateioNaturezas: RateioNatureza[];
 }
 
 export function FormularioClasseI({
@@ -34,6 +37,9 @@ export function FormularioClasseI({
   onChange,
   operacao,
   userOm,
+  planoOm,
+  naturezas,
+  rateioNaturezas,
 }: FormularioClasseIProps) {
   const calcularDias = () => {
     const inicio = new Date(operacao.dataInicio);
@@ -57,9 +63,16 @@ export function FormularioClasseI({
   const [carimboEditadoManualmente, setCarimboEditadoManualmente] =
     useState(false);
 
+  // Mapear naturezas selecionadas para códigos
+  const getNaturezasCodigos = useCallback(() => {
+    return rateioNaturezas
+      .map(rateio => naturezas.find(n => n.id === rateio.naturezaId)?.codigo)
+      .filter((codigo): codigo is string => codigo !== undefined);
+  }, [rateioNaturezas, naturezas]);
+
   useEffect(() => {
     calcular();
-  }, [params, tipo]);
+  }, [params, tipo, rateioNaturezas]);
 
   const calcular = useCallback(() => {
     const { efetivo, diasOperacao, numeroRefIntermediarias } = params;
@@ -89,12 +102,14 @@ export function FormularioClasseI({
       });
     }
 
+    // Usar planoOm ao invés de userOm, e passar naturezas selecionadas
     const detalhesCalculo = gerarCarimboCompleto({
-      unidade: userOm?.sigla || "OM não identificada",
+      unidade: planoOm?.sigla || "OM não identificada",
       nomeOperacao: operacao.nome,
       efetivo,
       resultado,
       tipoRefeicao,
+      naturezas: getNaturezasCodigos(),
     });
 
     setValorTotal(resultado.total);
@@ -104,7 +119,7 @@ export function FormularioClasseI({
     setCarimboEditadoManualmente(false);
 
     onChange({ params, valor: resultado.total, descricao: detalhesCalculo });
-  }, [params, onChange, operacao.nome, tipo, userOm]);
+  }, [params, onChange, operacao.nome, tipo, planoOm, getNaturezasCodigos]);
 
   const handleChange = (
     field: keyof ParametrosClasseI,
@@ -268,13 +283,15 @@ export function FormularioClasseI({
 
         <textarea
           value={carimbo || ""}
+          disabled={true}
           onChange={(e) => handleCarimboChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
           placeholder="O carimbo será gerado automaticamente..."
         />
 
         <p className="text-xs text-gray-500">
-          Este texto será usado como justificativa da despesa. Edite se necessário.
+          Este texto será usado como justificativa da despesa. Edite se
+          necessário.
         </p>
       </div>
     </div>

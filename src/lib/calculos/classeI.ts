@@ -95,8 +95,9 @@ export function gerarCarimboCompleto(params: {
   efetivo: number;
   resultado: ResultadoOperacao;
   tipoRefeicao: "QS" | "QR";
+  naturezas?: string[];
 }): string {
-  const { unidade, nomeOperacao, efetivo, resultado, tipoRefeicao } = params;
+  const { unidade, nomeOperacao, efetivo, resultado, tipoRefeicao, naturezas } = params;
 
   const tipoTexto = tipoRefeicao === "QR" ? "QR ETAPA e QR para refeições intermediárias" : "QS para refeições intermediárias";
   const textoPadrao = `Aquisição de gêneros alimentícios (${tipoTexto}) destinados a ${efetivo} militares no contexto da ${nomeOperacao}.`;
@@ -104,7 +105,12 @@ export function gerarCarimboCompleto(params: {
   const total = resultado.total;
   const totalFormatado = `R$ ${total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  return `33.90.30 – Destinado ao ${unidade}. ${textoPadrao}
+  // Usar naturezas dinâmicas ou fallback para 33.90.30
+  const naturezasTexto = naturezas && naturezas.length > 0
+    ? naturezas.join(" e ")
+    : "33.90.30";
+
+  return `${naturezasTexto} – Destinado ao ${unidade}. ${textoPadrao}
 Memória de Cálculo ${tipoRefeicao}:
 
 ${resultado.memoriaCalculo}

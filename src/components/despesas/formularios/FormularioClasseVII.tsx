@@ -13,13 +13,21 @@ import {
   getCustoDiaEfetivo,
 } from "@/lib/calculos/classeVII";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
-import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
+import type {
+  OperacaoWithEfetivo,
+  UserOM,
+  NaturezaSelect,
+  RateioNatureza,
+} from "@/types/despesas";
 
 interface FormularioClasseVIIProps {
   value: ParametrosClasseVII | null;
   onChange: (params: HandleParametrosChange) => void;
   operacao: OperacaoWithEfetivo;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
+  naturezas: NaturezaSelect[];
+  rateioNaturezas: RateioNatureza[];
 }
 
 export function FormularioClasseVII({
@@ -27,6 +35,9 @@ export function FormularioClasseVII({
   onChange,
   operacao,
   userOm,
+  planoOm,
+  naturezas,
+  rateioNaturezas,
 }: FormularioClasseVIIProps) {
   const diasTotaisOperacao = useMemo(() => {
     const inicio = new Date(operacao.dataInicio);
@@ -42,7 +53,8 @@ export function FormularioClasseVII({
 
   const [valorTotal, setValorTotal] = useState<number | null>(null);
   const [carimbo, setCarimbo] = useState<string>("");
-  const [carimboEditadoManualmente, setCarimboEditadoManualmente] = useState(false);
+  const [carimboEditadoManualmente, setCarimboEditadoManualmente] =
+    useState(false);
 
   const [tipoEquipamentoSelecionado, setTipoEquipamentoSelecionado] =
     useState<TipoEquipamento | null>(null);
@@ -51,6 +63,15 @@ export function FormularioClasseVII({
   const [custoMntDia, setCustoMntDia] = useState<number>(0);
 
   const equipamentosDisponiveis = listarTodosEquipamentos();
+
+  // Mapear naturezas selecionadas para códigos
+  const getNaturezasCodigos = () => {
+    return rateioNaturezas
+      .map(
+        (rateio) => naturezas.find((n) => n.id === rateio.naturezaId)?.codigo
+      )
+      .filter((codigo): codigo is string => codigo !== undefined);
+  };
 
   useEffect(() => {
     calcular();
@@ -66,8 +87,9 @@ export function FormularioClasseVII({
     try {
       const resultado = calcularClasseVII(
         { equipamentos },
-        userOm?.sigla,
-        operacao.nome
+        planoOm?.sigla,
+        operacao.nome,
+        getNaturezasCodigos()
       );
       setValorTotal(resultado.valorTotal);
       setCarimbo(resultado.detalhamento);
@@ -87,7 +109,11 @@ export function FormularioClasseVII({
   const handleCarimboChange = (novoCarimbo: string) => {
     setCarimbo(novoCarimbo);
     setCarimboEditadoManualmente(true);
-    onChange({ params: { equipamentos }, valor: valorTotal || 0, descricao: novoCarimbo });
+    onChange({
+      params: { equipamentos },
+      valor: valorTotal || 0,
+      descricao: novoCarimbo,
+    });
   };
 
   const handleResetCarimbo = () => {
@@ -191,6 +217,7 @@ export function FormularioClasseVII({
             </label>
             <div className="flex items-center gap-2">
               <input
+                disabled
                 type="number"
                 min="0.01"
                 step="0.01"
@@ -366,13 +393,15 @@ export function FormularioClasseVII({
 
         <textarea
           value={carimbo || ""}
+          disabled={true}
           onChange={(e) => handleCarimboChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
           placeholder="O carimbo será gerado automaticamente..."
         />
 
         <p className="text-xs text-gray-500">
-          Este texto será usado como justificativa da despesa. Edite se necessário.
+          Este texto será usado como justificativa da despesa. Edite se
+          necessário.
         </p>
       </div>
     </div>

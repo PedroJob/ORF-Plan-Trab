@@ -14,13 +14,21 @@ import {
   getNomeMaterial,
 } from "@/lib/calculos/classeVIII";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
-import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
+import type {
+  OperacaoWithEfetivo,
+  UserOM,
+  NaturezaSelect,
+  RateioNatureza,
+} from "@/types/despesas";
 
 interface FormularioClasseVIIIProps {
   value: ParametrosClasseVIII | null;
   onChange: (params: HandleParametrosChange) => void;
   operacao: OperacaoWithEfetivo;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
+  naturezas: NaturezaSelect[];
+  rateioNaturezas: RateioNatureza[];
 }
 
 export function FormularioClasseVIII({
@@ -28,6 +36,9 @@ export function FormularioClasseVIII({
   onChange,
   operacao,
   userOm,
+  planoOm,
+  naturezas,
+  rateioNaturezas,
 }: FormularioClasseVIIIProps) {
   const [materiais, setMateriais] = useState<ItemMaterialSaude[]>(
     value?.materiais || []
@@ -51,6 +62,15 @@ export function FormularioClasseVIII({
 
   const kitsDisponiveis = listarTodosKits();
 
+  // Mapear naturezas selecionadas para códigos
+  const getNaturezasCodigos = () => {
+    return rateioNaturezas
+      .map(
+        (rateio) => naturezas.find((n) => n.id === rateio.naturezaId)?.codigo
+      )
+      .filter((codigo): codigo is string => codigo !== undefined);
+  };
+
   useEffect(() => {
     calcular();
   }, [materiais]);
@@ -65,8 +85,9 @@ export function FormularioClasseVIII({
     try {
       const resultado = calcularClasseVIII(
         { materiais },
-        userOm?.sigla,
-        operacao.nome
+        planoOm?.sigla,
+        operacao.nome,
+        getNaturezasCodigos()
       );
       setValorTotal(resultado.valorTotal);
       setCarimbo(resultado.carimbo);
@@ -115,7 +136,8 @@ export function FormularioClasseVIII({
         custoCustomizado: custo,
       };
     } else {
-      const kitPadrao = KITS_SAUDE[tipoKitSelecionado! as Exclude<TipoKit, "OUTRO">];
+      const kitPadrao =
+        KITS_SAUDE[tipoKitSelecionado! as Exclude<TipoKit, "OUTRO">];
       const isCustomizado = custo !== kitPadrao.custo;
 
       novoMaterial = {
@@ -333,6 +355,7 @@ export function FormularioClasseVIII({
             </label>
             <div className="flex items-center gap-2">
               <input
+                disabled={!modoOutro}
                 type="number"
                 min="0.01"
                 step="0.01"
@@ -382,8 +405,7 @@ export function FormularioClasseVIII({
         {custo > 0 && quantidade > 0 && (
           <div className="bg-white rounded p-2 text-xs text-gray-600">
             <p>
-              <strong>Custo estimado:</strong> {quantidade} ×{" "}
-              R${" "}
+              <strong>Custo estimado:</strong> {quantidade} × R${" "}
               {custo.toLocaleString("pt-BR", {
                 minimumFractionDigits: 2,
               })}{" "}
@@ -438,6 +460,7 @@ export function FormularioClasseVIII({
 
         <textarea
           value={carimbo || ""}
+          disabled={true}
           onChange={(e) => handleCarimboChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[150px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
           placeholder="A memória de cálculo será gerada automaticamente..."

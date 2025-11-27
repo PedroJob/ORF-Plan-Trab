@@ -128,12 +128,18 @@ function gerarCarimbo(
   materiais: ItemMaterialSaude[],
   valorTotal: number,
   unidade?: string,
-  nomeOperacao?: string
+  nomeOperacao?: string,
+  naturezas?: string[]
 ): string {
   const totalFormatado = `R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const unidadeTexto = unidade || "OM não identificada";
   const operacaoTexto = nomeOperacao || "operação";
   const textoPadrao = `Aquisição de materiais de saúde e kits de primeiros socorros para emprego durante a ${operacaoTexto}.`;
+
+  // Usar naturezas dinâmicas ou fallback para padrão
+  const naturezasTexto = naturezas && naturezas.length > 0
+    ? naturezas.join(" e ")
+    : "33.90.30";
 
   let memoriaCalculo = "";
 
@@ -148,7 +154,7 @@ function gerarCarimbo(
     memoriaCalculo += `  Subtotal: R$ ${custoItem.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n\n`;
   }
 
-  return `33.90.30 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+  return `${naturezasTexto} – Destinado ao ${unidadeTexto}. ${textoPadrao}
 Memória de Cálculo:
 
 ${memoriaCalculo}
@@ -161,7 +167,8 @@ Total: ${totalFormatado}`;
 export function calcularClasseVIII(
   params: ParametrosClasseVIII,
   unidade?: string,
-  nomeOperacao?: string
+  nomeOperacao?: string,
+  naturezas?: string[]
 ): ResultadoClasseVIII {
   if (!params.materiais || params.materiais.length === 0) {
     throw new Error("Deve haver pelo menos um material de saúde");
@@ -178,7 +185,7 @@ export function calcularClasseVIII(
   }
 
   const valorTotalFinal = Number(valorTotal.toFixed(2));
-  const carimbo = gerarCarimbo(params.materiais, valorTotalFinal, unidade, nomeOperacao);
+  const carimbo = gerarCarimbo(params.materiais, valorTotalFinal, unidade, nomeOperacao, naturezas);
 
   return {
     valorTotal: valorTotalFinal,

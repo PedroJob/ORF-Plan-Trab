@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { PreviewCalculo } from "../PreviewCalculo";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
-import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
+import type { OperacaoWithEfetivo, UserOM, NaturezaSelect, RateioNatureza } from "@/types/despesas";
 
 interface ParametrosClasseX {
   quantidade: number;
@@ -16,6 +16,9 @@ interface FormularioClasseXProps {
   onChange: (params: HandleParametrosChange) => void;
   operacao: OperacaoWithEfetivo;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
+  naturezas: NaturezaSelect[];
+  rateioNaturezas: RateioNatureza[];
 }
 
 export function FormularioClasseX({
@@ -23,6 +26,9 @@ export function FormularioClasseX({
   onChange,
   operacao,
   userOm,
+  planoOm,
+  naturezas,
+  rateioNaturezas,
 }: FormularioClasseXProps) {
   const [params, setParams] = useState<ParametrosClasseX>(
     value || {
@@ -34,7 +40,15 @@ export function FormularioClasseX({
 
   const [valorTotal, setValorTotal] = useState<number | null>(null);
   const [carimbo, setCarimbo] = useState<string>("");
-  const [carimboEditadoManualmente, setCarimboEditadoManualmente] = useState(false);
+  const [carimboEditadoManualmente, setCarimboEditadoManualmente] =
+    useState(false);
+
+  // Mapear naturezas selecionadas para códigos
+  const getNaturezasCodigos = () => {
+    return rateioNaturezas
+      .map(rateio => naturezas.find(n => n.id === rateio.naturezaId)?.codigo)
+      .filter((codigo): codigo is string => codigo !== undefined);
+  };
 
   useEffect(() => {
     calcular();
@@ -56,13 +70,22 @@ export function FormularioClasseX({
 
     const total = quantidade * valorUnitario;
     const totalFinal = Number(total.toFixed(2));
-    const totalFormatado = `R$ ${totalFinal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const unidadeTexto = userOm?.sigla || "OM não identificada";
+    const totalFormatado = `R$ ${totalFinal.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+    const unidadeTexto = planoOm?.sigla || "OM não identificada";
     const operacaoTexto = operacao.nome || "operação";
     const textoPadrao = `Aquisição de material não classificado para emprego durante a ${operacaoTexto}.`;
 
+    // Usar naturezas selecionadas ou fallback
+    const naturezasCodigos = getNaturezasCodigos();
+    const naturezasTexto = naturezasCodigos.length > 0
+      ? naturezasCodigos.join(" e ")
+      : "33.90.30";
+
     // Gerar memória de cálculo como string
-    const memoriaCalculo = `33.90.30 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+    const memoriaCalculo = `${naturezasTexto} – Destinado ao ${unidadeTexto}. ${textoPadrao}
 Memória de Cálculo:
 
 Descrição: ${descricaoDetalhada || "Não especificado"}
@@ -185,13 +208,15 @@ Total: ${totalFormatado}`;
 
         <textarea
           value={carimbo || ""}
+          disabled={true}
           onChange={(e) => handleCarimboChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
           placeholder="O carimbo será gerado automaticamente..."
         />
 
         <p className="text-xs text-gray-500">
-          Este texto será usado como justificativa da despesa. Edite se necessário.
+          Este texto será usado como justificativa da despesa. Edite se
+          necessário.
         </p>
       </div>
     </div>

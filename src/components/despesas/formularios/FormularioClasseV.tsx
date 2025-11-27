@@ -13,13 +13,21 @@ import {
   getCustoDiaEfetivo,
 } from "@/lib/calculos/classeV";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
-import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
+import type {
+  OperacaoWithEfetivo,
+  UserOM,
+  NaturezaSelect,
+  RateioNatureza,
+} from "@/types/despesas";
 
 interface FormularioClasseVProps {
   value: ParametrosClasseV | null;
   onChange: (params: HandleParametrosChange) => void;
   operacao: OperacaoWithEfetivo;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
+  naturezas: NaturezaSelect[];
+  rateioNaturezas: RateioNatureza[];
 }
 
 export function FormularioClasseV({
@@ -27,6 +35,9 @@ export function FormularioClasseV({
   onChange,
   operacao,
   userOm,
+  planoOm,
+  naturezas,
+  rateioNaturezas,
 }: FormularioClasseVProps) {
   // Calcular dias totais da operação
   const diasTotaisOperacao = useMemo(() => {
@@ -43,7 +54,8 @@ export function FormularioClasseV({
 
   const [valorTotal, setValorTotal] = useState<number | null>(null);
   const [carimbo, setCarimbo] = useState<string>("");
-  const [carimboEditadoManualmente, setCarimboEditadoManualmente] = useState(false);
+  const [carimboEditadoManualmente, setCarimboEditadoManualmente] =
+    useState(false);
 
   // Estado para novo item de armamento
   const [tipoArmamentoSelecionado, setTipoArmamentoSelecionado] =
@@ -53,6 +65,15 @@ export function FormularioClasseV({
   const [custoMntDia, setCustoMntDia] = useState<number>(0);
 
   const armamentosDisponiveis = listarTodosArmamentos();
+
+  // Mapear naturezas selecionadas para códigos
+  const getNaturezasCodigos = () => {
+    return rateioNaturezas
+      .map(
+        (rateio) => naturezas.find((n) => n.id === rateio.naturezaId)?.codigo
+      )
+      .filter((codigo): codigo is string => codigo !== undefined);
+  };
 
   useEffect(() => {
     calcular();
@@ -68,8 +89,9 @@ export function FormularioClasseV({
     try {
       const resultado = calcularClasseV(
         { armamentos },
-        userOm?.sigla,
-        operacao.nome
+        planoOm?.sigla,
+        operacao.nome,
+        getNaturezasCodigos()
       );
       setValorTotal(resultado.valorTotal);
       setCarimbo(resultado.detalhamento);
@@ -89,7 +111,11 @@ export function FormularioClasseV({
   const handleCarimboChange = (novoCarimbo: string) => {
     setCarimbo(novoCarimbo);
     setCarimboEditadoManualmente(true);
-    onChange({ params: { armamentos }, valor: valorTotal || 0, descricao: novoCarimbo });
+    onChange({
+      params: { armamentos },
+      valor: valorTotal || 0,
+      descricao: novoCarimbo,
+    });
   };
 
   const handleResetCarimbo = () => {
@@ -285,6 +311,7 @@ export function FormularioClasseV({
                 type="number"
                 min="0.01"
                 step="0.01"
+                disabled
                 value={custoMntDia || ""}
                 onChange={(e) =>
                   setCustoMntDia(parseFloat(e.target.value) || 0)
@@ -405,13 +432,15 @@ export function FormularioClasseV({
 
         <textarea
           value={carimbo || ""}
+          disabled={true}
           onChange={(e) => handleCarimboChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
           placeholder="O carimbo será gerado automaticamente..."
         />
 
         <p className="text-xs text-gray-500">
-          Este texto será usado como justificativa da despesa. Edite se necessário.
+          Este texto será usado como justificativa da despesa. Edite se
+          necessário.
         </p>
       </div>
     </div>

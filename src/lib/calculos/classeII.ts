@@ -279,7 +279,8 @@ Memória de cálculo: [${formulaParcelas}] x ${dias} dias = R$ ${valorOutros.toF
 export function calcularClasseII(
   params: ParametrosClasseII,
   unidade?: string,
-  nomeOperacao?: string
+  nomeOperacao?: string,
+  naturezas?: string[]
 ): ResultadoClasseII {
   if (!params.materiais || params.materiais.length === 0) {
     throw new Error("Deve haver pelo menos um material");
@@ -298,10 +299,15 @@ export function calcularClasseII(
   const unidadeTexto = unidade || "OM não identificada";
   const operacaoTexto = nomeOperacao || "operação";
 
+  // Usar naturezas dinâmicas ou fallback para padrão
+  const naturezasTexto = naturezas && naturezas.length > 0
+    ? naturezas.join(" e ")
+    : "33.90.30 e 33.90.39";
+
   // Montar carimbo no formato padrão
   const textoPadrao = `Aquisição de insumos para recuperação e reparação dos equipamentos empregados durante a ${operacaoTexto}.`;
 
-  const carimboCompleto = `33.90.30 e 33.90.39 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+  const carimboCompleto = `${naturezasTexto} – Destinado ao ${unidadeTexto}. ${textoPadrao}
 Memória de Cálculo:
 
 ${secoesMateriais.join("\n\n")}

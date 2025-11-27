@@ -326,6 +326,7 @@ async function main() {
         isCriavelUsuario: true,
       },
     ],
+    skipDuplicates: false,
   });
 
   // Classe III - Combustíveis (não criáveis pelo usuário)
@@ -344,6 +345,7 @@ async function main() {
         isCriavelUsuario: false,
       },
     ],
+    skipDuplicates: false,
   });
 
   // Classe V - Munição e Explosivos
@@ -368,6 +370,7 @@ async function main() {
         isCriavelUsuario: true,
       },
     ],
+    skipDuplicates: false,
   });
 
   // Classe VI - Material Individual
@@ -392,17 +395,12 @@ async function main() {
         isCriavelUsuario: true,
       },
     ],
+    skipDuplicates: false,
   });
 
   // Classe VII - Equipamento Principal
   await prisma.tipo.createMany({
     data: [
-      {
-        nome: "Aquisição de Equipamento",
-        classeId: classeVII.id,
-        isCombustivel: false,
-        isCriavelUsuario: true,
-      },
       {
         nome: "Manutenção de Equipamento",
         classeId: classeVII.id,
@@ -410,6 +408,7 @@ async function main() {
         isCriavelUsuario: true,
       },
     ],
+    skipDuplicates: false,
   });
 
   // Classe VIII - Material de Saúde
@@ -434,30 +433,7 @@ async function main() {
         isCriavelUsuario: true,
       },
     ],
-  });
-
-  // Classe IX - Manutenção de Viaturas
-  await prisma.tipo.createMany({
-    data: [
-      {
-        nome: "Manutenção GP1",
-        classeId: classeIX.id,
-        isCombustivel: false,
-        isCriavelUsuario: true,
-      },
-      {
-        nome: "Manutenção GP2",
-        classeId: classeIX.id,
-        isCombustivel: false,
-        isCriavelUsuario: true,
-      },
-      {
-        nome: "Manutenção GP3",
-        classeId: classeIX.id,
-        isCombustivel: false,
-        isCriavelUsuario: true,
-      },
-    ],
+    skipDuplicates: false,
   });
 
   console.log("  ✓ Tipos de despesa criados para todas as classes");
@@ -508,6 +484,7 @@ async function main() {
         valorLimite: 250000.0, // R$ 250.000,00 para a 12ª RM
       },
     ],
+    skipDuplicates: false,
   });
   console.log("  ✓ 6º BEC participando com limite R$ 400.000,00");
   console.log("  ✓ 7º BIS participando com limite R$ 350.000,00");

@@ -93,7 +93,8 @@ export function RateioNaturezas({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <label className="block text-sm font-medium text-gray-700">
-          Rateio por Naturezas <span className="text-red-500">*</span>
+          Rateio por Natureza de Despesas{" "}
+          <span className="text-red-500">*</span>
         </label>
         {showSomaIndicator && (
           <div

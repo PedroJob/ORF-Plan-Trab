@@ -13,13 +13,21 @@ import {
 } from "@/lib/calculos/classeII";
 import { Trash2, Plus, X } from "lucide-react";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
-import { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
+import {
+  OperacaoWithEfetivo,
+  UserOM,
+  NaturezaSelect,
+  RateioNatureza,
+} from "@/types/despesas";
 
 interface FormularioClasseIIProps {
   operacao: OperacaoWithEfetivo;
   value: ParametrosClasseII | null;
   onChange: (params: HandleParametrosChange) => void;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
+  naturezas: NaturezaSelect[];
+  rateioNaturezas: RateioNatureza[];
 }
 
 const LABELS_TIPO_MATERIAL: Record<TipoMaterialClasseII, string> = {
@@ -33,6 +41,9 @@ export function FormularioClasseII({
   value,
   onChange,
   userOm,
+  planoOm,
+  naturezas,
+  rateioNaturezas,
 }: FormularioClasseIIProps) {
   const [materiais, setMateriais] = useState<MaterialClasseII[]>(
     value?.materiais || []
@@ -71,9 +82,18 @@ export function FormularioClasseII({
     periodoDias: intervaloDias,
   });
 
+  // Mapear naturezas selecionadas para códigos
+  const getNaturezasCodigos = () => {
+    return rateioNaturezas
+      .map(
+        (rateio) => naturezas.find((n) => n.id === rateio.naturezaId)?.codigo
+      )
+      .filter((codigo): codigo is string => codigo !== undefined);
+  };
+
   useEffect(() => {
     calcular();
-  }, [materiais]);
+  }, [materiais, rateioNaturezas]);
 
   const calcular = () => {
     if (materiais.length === 0) {
@@ -83,10 +103,12 @@ export function FormularioClasseII({
     }
 
     try {
+      // Usar planoOm ao invés de userOm, e passar naturezas selecionadas
       const resultado = calcularClasseII(
         { materiais },
-        userOm?.sigla,
-        operacao.nome
+        planoOm?.sigla,
+        operacao.nome,
+        getNaturezasCodigos()
       );
       setValorTotal(resultado.valorTotal);
 
@@ -178,10 +200,13 @@ export function FormularioClasseII({
     setMateriais(novosMateriais);
   };
 
-  const adicionarItemBalistico = (tipo: "Capacete Balístico" | "Colete Balístico") => {
-    const valorDia = tipo === "Capacete Balístico"
-      ? VALORES_MANUTENCAO.CAPACETE_DIA
-      : VALORES_MANUTENCAO.COLETE_DIA;
+  const adicionarItemBalistico = (
+    tipo: "Capacete Balístico" | "Colete Balístico"
+  ) => {
+    const valorDia =
+      tipo === "Capacete Balístico"
+        ? VALORES_MANUTENCAO.CAPACETE_DIA
+        : VALORES_MANUTENCAO.COLETE_DIA;
 
     const novoItem: ItemManutencao = {
       tipo,
@@ -374,17 +399,23 @@ export function FormularioClasseII({
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => adicionarItemBalistico("Capacete Balístico")}
+                        onClick={() =>
+                          adicionarItemBalistico("Capacete Balístico")
+                        }
                         className="px-3 py-2 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
                       >
-                        + Capacete (R$ {VALORES_MANUTENCAO.CAPACETE_DIA.toFixed(2)}/dia)
+                        + Capacete (R${" "}
+                        {VALORES_MANUTENCAO.CAPACETE_DIA.toFixed(2)}/dia)
                       </button>
                       <button
                         type="button"
-                        onClick={() => adicionarItemBalistico("Colete Balístico")}
+                        onClick={() =>
+                          adicionarItemBalistico("Colete Balístico")
+                        }
                         className="px-3 py-2 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
                       >
-                        + Colete (R$ {VALORES_MANUTENCAO.COLETE_DIA.toFixed(2)}/dia)
+                        + Colete (R$ {VALORES_MANUTENCAO.COLETE_DIA.toFixed(2)}
+                        /dia)
                       </button>
                     </div>
                   </div>
@@ -405,7 +436,8 @@ export function FormularioClasseII({
                               value={item.quantidade}
                               onChange={(e) => {
                                 const novosItens = [...itensBalisticos];
-                                novosItens[index].quantidade = parseInt(e.target.value) || 1;
+                                novosItens[index].quantidade =
+                                  parseInt(e.target.value) || 1;
                                 setItensBalisticos(novosItens);
                               }}
                               className="px-2 py-1 border border-gray-300 rounded"
@@ -420,7 +452,10 @@ export function FormularioClasseII({
                               onChange={(e) => {
                                 const valor = parseInt(e.target.value) || 1;
                                 const novosItens = [...itensBalisticos];
-                                novosItens[index].periodoDias = Math.min(valor, intervaloDias);
+                                novosItens[index].periodoDias = Math.min(
+                                  valor,
+                                  intervaloDias
+                                );
                                 setItensBalisticos(novosItens);
                               }}
                               className="px-2 py-1 border border-gray-300 rounded"
@@ -518,46 +553,63 @@ export function FormularioClasseII({
                       placeholder="Tipo do item"
                     />
                     <div className="grid grid-cols-3 gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        value={novoItem.quantidade || ""}
-                        onChange={(e) =>
-                          setNovoItem((prev) => ({
-                            ...prev,
-                            quantidade: parseInt(e.target.value) || 1,
-                          }))
-                        }
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
-                        placeholder="Qtd"
-                      />
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={novoItem.mntDia || ""}
-                        onChange={(e) =>
-                          setNovoItem((prev) => ({
-                            ...prev,
-                            mntDia: parseFloat(e.target.value) || 0,
-                          }))
-                        }
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
-                        placeholder="R$/dia"
-                      />
-                      <input
-                        type="number"
-                        min="1"
-                        value={novoItem.periodoDias || ""}
-                        onChange={(e) =>
-                          setNovoItem((prev) => ({
-                            ...prev,
-                            periodoDias: parseInt(e.target.value) || 0,
-                          }))
-                        }
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
-                        placeholder="Dias"
-                      />
+                      <div className="flex flex-col">
+                        <p className="text-xs font-medium text-gray-700">
+                          Quantidade:
+                        </p>
+                        <input
+                          type="number"
+                          min="1"
+                          value={novoItem.quantidade || ""}
+                          onChange={(e) =>
+                            setNovoItem((prev) => ({
+                              ...prev,
+                              quantidade: parseInt(e.target.value) || 1,
+                            }))
+                          }
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                          placeholder="Qtd"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <p className="text-xs font-medium text-gray-700">
+                          Manutenção (R$/dia):
+                        </p>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          disabled
+                          value={novoItem.mntDia || ""}
+                          onChange={(e) =>
+                            setNovoItem((prev) => ({
+                              ...prev,
+                              mntDia: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                          placeholder="R$/dia"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <p className="text-xs font-medium text-gray-700">
+                          Período (dias):
+                        </p>
+                        <input
+                          type="number"
+                          min="1"
+                          max={operacao.diasTotais}
+                          value={novoItem.periodoDias || ""}
+                          onChange={(e) =>
+                            setNovoItem((prev) => ({
+                              ...prev,
+                              periodoDias: parseInt(e.target.value) || 0,
+                            }))
+                          }
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                          placeholder="Dias"
+                        />
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -693,13 +745,15 @@ export function FormularioClasseII({
 
         <textarea
           value={carimbo || ""}
+          disabled={true}
           onChange={(e) => handleCarimboChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
           placeholder="O carimbo será gerado automaticamente..."
         />
 
         <p className="text-xs text-gray-500">
-          Este texto será usado como justificativa da despesa. Edite se necessário.
+          Este texto será usado como justificativa da despesa. Edite se
+          necessário.
         </p>
       </div>
     </div>

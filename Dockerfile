@@ -8,11 +8,11 @@ RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 # Copiar arquivos de dependências
-COPY package.json package-lock.json* ./
+COPY package.json yarn.lock ./
 COPY prisma ./prisma/
 
-# Instalar dependências
-RUN npm ci
+# Instalar dependências com yarn
+RUN yarn install --frozen-lockfile
 
 # ============================================
 # Estágio 2: Build
@@ -28,12 +28,15 @@ RUN npx prisma generate
 
 # Build da aplicação Next.js
 ENV NEXT_TELEMETRY_DISABLED 1
-RUN npm run build
+RUN yarn build
 
 # ============================================
 # Estágio 3: Runner (Produção)
 FROM node:18-alpine AS runner
 WORKDIR /app
+
+# Instalar openssl para Prisma
+RUN apk add --no-cache openssl
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
@@ -50,10 +53,15 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copiar Prisma
+# Copiar Prisma (incluindo CLI para migrations)
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/prisma ./prisma
+
+# Copiar script de entrada
+COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
 
 # Mudar para usuário não-root
 USER nextjs
@@ -64,7 +72,7 @@ ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
 # Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-CMD ["node", "server.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]

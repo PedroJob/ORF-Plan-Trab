@@ -58,6 +58,7 @@ interface ModalCriarDespesaProps {
   onSuccess: () => void;
   despesaToEdit?: DespesaToEdit | null;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
 }
 
 export function ModalCriarDespesa({
@@ -69,6 +70,7 @@ export function ModalCriarDespesa({
   onSuccess,
   despesaToEdit = null,
   userOm,
+  planoOm,
 }: ModalCriarDespesaProps) {
   const [loading, setLoading] = useState(false);
   const [loadingClasses, setLoadingClasses] = useState(true);
@@ -384,6 +386,16 @@ export function ModalCriarDespesa({
       setDescricao(params.descricao || "");
     };
 
+    // Props comuns para todos os formulários
+    const commonProps = {
+      onChange: handleParametrosChange,
+      operacao,
+      userOm,
+      planoOm,
+      naturezas,
+      rateioNaturezas,
+    };
+
     switch (classeSelecionada.nome) {
       case "CLASSE_I":
         if (!tipoSelecionado) return null;
@@ -391,94 +403,46 @@ export function ModalCriarDespesa({
           <FormularioClasseI
             value={parametros as any}
             tipo={tipoSelecionado}
-            onChange={handleParametrosChange}
-            operacao={operacao}
-            userOm={userOm}
+            {...commonProps}
           />
         );
       case "CLASSE_II":
         return (
-          <FormularioClasseII
-            operacao={operacao}
-            value={parametros as any}
-            onChange={handleParametrosChange}
-            userOm={userOm}
-          />
+          <FormularioClasseII value={parametros as any} {...commonProps} />
         );
       case "CLASSE_III":
         if (!tipoSelecionado) return null;
         return (
           <FormularioClasseIII
             tipoSelecionado={tipoSelecionado}
-            operacao={operacao}
             value={parametros as any}
-            onChange={handleParametrosChange}
-            userOm={userOm}
+            {...commonProps}
           />
         );
       case "CLASSE_IV":
         return (
-          <FormularioClasseIV
-            value={parametros as any}
-            onChange={handleParametrosChange}
-            operacao={operacao}
-            userOm={userOm}
-          />
+          <FormularioClasseIV value={parametros as any} {...commonProps} />
         );
       case "CLASSE_V":
-        return (
-          <FormularioClasseV
-            value={parametros as any}
-            onChange={handleParametrosChange}
-            operacao={operacao}
-            userOm={userOm}
-          />
-        );
+        return <FormularioClasseV value={parametros as any} {...commonProps} />;
       case "CLASSE_VI":
         return (
-          <FormularioClasseVI
-            value={parametros as any}
-            onChange={handleParametrosChange}
-            operacao={operacao}
-            userOm={userOm}
-          />
+          <FormularioClasseVI value={parametros as any} {...commonProps} />
         );
       case "CLASSE_VII":
         return (
-          <FormularioClasseVII
-            value={parametros as any}
-            onChange={handleParametrosChange}
-            operacao={operacao}
-            userOm={userOm}
-          />
+          <FormularioClasseVII value={parametros as any} {...commonProps} />
         );
       case "CLASSE_VIII":
         return (
-          <FormularioClasseVIII
-            value={parametros as any}
-            onChange={handleParametrosChange}
-            operacao={operacao}
-            userOm={userOm}
-          />
+          <FormularioClasseVIII value={parametros as any} {...commonProps} />
         );
       case "CLASSE_IX":
         return (
-          <FormularioClasseIX
-            value={parametros as any}
-            onChange={handleParametrosChange}
-            operacao={operacao}
-            userOm={userOm}
-          />
+          <FormularioClasseIX value={parametros as any} {...commonProps} />
         );
       case "CLASSE_X":
-        return (
-          <FormularioClasseX
-            value={parametros as any}
-            onChange={handleParametrosChange}
-            operacao={operacao}
-            userOm={userOm}
-          />
-        );
+        return <FormularioClasseX value={parametros as any} {...commonProps} />;
       default:
         return null;
     }
@@ -573,17 +537,6 @@ export function ModalCriarDespesa({
                   </option>
                 ))}
               </select>
-
-              {!showCriarTipo && (
-                <button
-                  type="button"
-                  onClick={() => setShowCriarTipo(true)}
-                  className="mt-2 text-sm text-green-700 hover:text-green-800 flex items-center gap-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  Criar novo tipo
-                </button>
-              )}
 
               {showCriarTipo && (
                 <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-md space-y-2">

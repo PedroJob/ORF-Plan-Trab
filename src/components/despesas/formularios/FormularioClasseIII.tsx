@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { PreviewCalculo } from "../PreviewCalculo";
-import { Plus, X, Trash2 } from "lucide-react";
+import { Plus, X, Trash2, RefreshCw, AlertCircle } from "lucide-react";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
 import { Tipo } from "@prisma/client";
-import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
+import type { OperacaoWithEfetivo, UserOM, NaturezaSelect, RateioNatureza } from "@/types/despesas";
 import {
   calcularClasseIII,
   ParametrosClasseIII,
@@ -15,7 +15,12 @@ import {
   Equipamento,
   filtrarViaturasPorCombustivel,
   filtrarEquipamentosPorCombustivel,
-  PRECOS_COMBUSTIVEL,
+  SiglaEstado,
+  ESTADOS_BRASIL,
+  PrecosCombustivelAPI,
+  fetchPrecosCombustivel,
+  getPrecoEstado,
+  getEstadosDisponiveis,
 } from "@/lib/calculos/classeIII";
 
 interface FormularioClasseIIIProps {
@@ -24,6 +29,9 @@ interface FormularioClasseIIIProps {
   value: ParametrosClasseIII | null;
   onChange: (params: HandleParametrosChange) => void;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
+  naturezas: NaturezaSelect[];
+  rateioNaturezas: RateioNatureza[];
 }
 
 export function FormularioClasseIII({
@@ -32,6 +40,9 @@ export function FormularioClasseIII({
   value,
   onChange,
   userOm,
+  planoOm,
+  naturezas,
+  rateioNaturezas,
 }: FormularioClasseIIIProps) {
   // Mapear tipo do banco para tipo de combustível
   const getTipoCombustivel = (): TipoCombustivel => {
@@ -64,6 +75,13 @@ export function FormularioClasseIII({
   const [carimboEditadoManualmente, setCarimboEditadoManualmente] =
     useState(false);
 
+  // Estados para API de preços
+  const [precosAPI, setPrecosAPI] = useState<PrecosCombustivelAPI | null>(null);
+  const [loadingPrecos, setLoadingPrecos] = useState(true);
+  const [erroAPI, setErroAPI] = useState(false);
+  const [estadoSelecionado, setEstadoSelecionado] = useState<SiglaEstado>("br");
+  const [dataColeta, setDataColeta] = useState<string | null>(null);
+
   // Estado para adicionar novo item
   const [showFormulario, setShowFormulario] = useState(false);
   const [tipoItemSelecionado, setTipoItemSelecionado] = useState<
@@ -90,9 +108,52 @@ export function FormularioClasseIII({
   const [horasMediaDiaria, setHorasMediaDiaria] = useState(0);
   const [diasUsoEquipamento, setDiasUsoEquipamento] = useState(0);
 
+  // Buscar preços da API ao montar o componente
+  const carregarPrecos = useCallback(async () => {
+    setLoadingPrecos(true);
+    setErroAPI(false);
+    try {
+      const precos = await fetchPrecosCombustivel();
+      if (precos) {
+        setPrecosAPI(precos);
+        setDataColeta(precos.dataColeta || null);
+      } else {
+        setErroAPI(true);
+      }
+    } catch {
+      setErroAPI(true);
+    } finally {
+      setLoadingPrecos(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    carregarPrecos();
+  }, [carregarPrecos]);
+
+  // Obter preço atual baseado no estado selecionado
+  const precoAtual = useMemo(() => {
+    if (usarPrecoCustomizado && precoCombustivelCustomizado !== undefined) {
+      return precoCombustivelCustomizado;
+    }
+    return getPrecoEstado(tipoCombustivel, estadoSelecionado, precosAPI);
+  }, [tipoCombustivel, estadoSelecionado, precosAPI, usarPrecoCustomizado, precoCombustivelCustomizado]);
+
+  // Obter lista de estados disponíveis
+  const estadosDisponiveis = useMemo(() => {
+    return getEstadosDisponiveis(tipoCombustivel, precosAPI);
+  }, [tipoCombustivel, precosAPI]);
+
   useEffect(() => {
     calcular();
-  }, [itens, precoCombustivelCustomizado, usarPrecoCustomizado]);
+  }, [itens, precoCombustivelCustomizado, usarPrecoCustomizado, estadoSelecionado, precosAPI]);
+
+  // Mapear naturezas selecionadas para códigos
+  const getNaturezasCodigos = () => {
+    return rateioNaturezas
+      .map(rateio => naturezas.find(n => n.id === rateio.naturezaId)?.codigo)
+      .filter((codigo): codigo is string => codigo !== undefined);
+  };
 
   const calcular = () => {
     if (itens.length === 0) {
@@ -103,16 +164,20 @@ export function FormularioClasseIII({
     }
 
     try {
+      // Usar o preço atual (do estado ou customizado)
+      const precoParaCalculo = precoAtual;
+
       const resultado = calcularClasseIII(
         {
           itens,
           tipoCombustivel,
-          precoCombustivelCustomizado: usarPrecoCustomizado
-            ? precoCombustivelCustomizado
-            : undefined,
+          precoCombustivelCustomizado: precoParaCalculo,
+          estadoSelecionado: estadoSelecionado,
+          dataColetaPreco: dataColeta || undefined,
         },
-        userOm?.sigla,
-        operacao.nome
+        planoOm?.sigla,
+        operacao.nome,
+        getNaturezasCodigos()
       );
       setValorTotal(resultado.valorTotal);
       setValorCombustivel(resultado.valorCombustivel);
@@ -125,9 +190,9 @@ export function FormularioClasseIII({
         params: {
           itens,
           tipoCombustivel,
-          precoCombustivelCustomizado: usarPrecoCustomizado
-            ? precoCombustivelCustomizado
-            : undefined,
+          precoCombustivelCustomizado: precoParaCalculo,
+          estadoSelecionado: estadoSelecionado,
+          dataColetaPreco: dataColeta || undefined,
         },
         valor: resultado.valorTotal,
         valorCombustivel: resultado.valorCombustivel,
@@ -245,9 +310,9 @@ export function FormularioClasseIII({
       params: {
         itens,
         tipoCombustivel,
-        precoCombustivelCustomizado: usarPrecoCustomizado
-          ? precoCombustivelCustomizado
-          : undefined,
+        precoCombustivelCustomizado: precoAtual,
+        estadoSelecionado: estadoSelecionado,
+        dataColetaPreco: dataColeta || undefined,
       },
       valor: valorTotal || 0,
       valorCombustivel: valorCombustivel || 0,
@@ -266,8 +331,14 @@ export function FormularioClasseIII({
       setPrecoCombustivelCustomizado(undefined);
     } else {
       setUsarPrecoCustomizado(true);
-      setPrecoCombustivelCustomizado(PRECOS_COMBUSTIVEL[tipoCombustivel]);
+      // Inicializar com o preço atual do estado
+      setPrecoCombustivelCustomizado(getPrecoEstado(tipoCombustivel, estadoSelecionado, precosAPI));
     }
+  };
+
+  const handleEstadoChange = (novoEstado: SiglaEstado) => {
+    setEstadoSelecionado(novoEstado);
+    // Se não estiver usando preço customizado, o preço será atualizado automaticamente pelo useMemo
   };
 
   return (
@@ -286,23 +357,67 @@ export function FormularioClasseIII({
       </div>
 
       {/* Configuração de preço do combustível */}
-      <div className="bg-gray-50 border border-gray-200 rounded-md p-3 space-y-2">
+      <div className="bg-gray-50 border border-gray-200 rounded-md p-3 space-y-3">
         <div className="flex items-center justify-between">
           <label className="block text-sm font-medium text-gray-700">
             Preço do Combustível
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <button
+            type="button"
+            onClick={carregarPrecos}
+            disabled={loadingPrecos}
+            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+            title="Atualizar preços da API"
+          >
+            <RefreshCw className={`w-3 h-3 ${loadingPrecos ? "animate-spin" : ""}`} />
+            Atualizar
+          </button>
+        </div>
+
+        {/* Seleção de estado */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Estado para referência de preço
+          </label>
+          <select
+            value={estadoSelecionado}
+            onChange={(e) => handleEstadoChange(e.target.value as SiglaEstado)}
+            disabled={usarPrecoCustomizado || loadingPrecos}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+          >
+            {estadosDisponiveis.map((sigla) => (
+              <option key={sigla} value={sigla}>
+                {ESTADOS_BRASIL[sigla]} - R$ {getPrecoEstado(tipoCombustivel, sigla, precosAPI).toFixed(2)}
+              </option>
+            ))}
+          </select>
+          {erroAPI && (
+            <div className="flex items-center gap-1 mt-1 text-xs text-amber-600">
+              <AlertCircle className="w-3 h-3" />
+              Usando preços de referência (API indisponível)
+            </div>
+          )}
+          {dataColeta && !erroAPI && (
+            <p className="text-xs text-gray-500 mt-1">
+              Fonte: Petrobras • Atualizado em: {dataColeta}
+            </p>
+          )}
+        </div>
+
+        {/* Toggle para preço customizado - só aparece se API falhou */}
+        {erroAPI && (
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="checkbox"
               checked={usarPrecoCustomizado}
               onChange={handleTogglePrecoCustomizado}
               className="rounded border-gray-300 text-green-600 focus:ring-green-500"
             />
-            Usar preço customizado
+            Inserir preço manualmente
           </label>
-        </div>
+        )}
 
-        {usarPrecoCustomizado ? (
+        {usarPrecoCustomizado && erroAPI ? (
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">R$</span>
@@ -322,15 +437,19 @@ export function FormularioClasseIII({
               <span className="text-sm text-gray-600">/ litro</span>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Preço médio nacional: R${" "}
-              {PRECOS_COMBUSTIVEL[tipoCombustivel].toFixed(2)}/litro
+              Preço de referência ({ESTADOS_BRASIL[estadoSelecionado]}): R${" "}
+              {getPrecoEstado(tipoCombustivel, estadoSelecionado, precosAPI).toFixed(2)}/litro
             </p>
           </div>
         ) : (
-          <p className="text-sm text-gray-600">
-            Usando preço médio nacional: R${" "}
-            {PRECOS_COMBUSTIVEL[tipoCombustivel].toFixed(2)}/litro
-          </p>
+          <div className="bg-green-50 border border-green-200 rounded p-2">
+            <p className="text-sm font-medium text-green-800">
+              Preço atual: R$ {precoAtual.toFixed(2)}/litro
+            </p>
+            <p className="text-xs text-green-600">
+              {ESTADOS_BRASIL[estadoSelecionado]}
+            </p>
+          </div>
         )}
       </div>
 
@@ -671,13 +790,15 @@ export function FormularioClasseIII({
 
         <textarea
           value={carimbo || ""}
+          disabled={true}
           onChange={(e) => handleCarimboChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
           placeholder="O carimbo será gerado automaticamente..."
         />
 
         <p className="text-xs text-gray-500">
-          Este texto será usado como justificativa da despesa. Edite se necessário.
+          Este texto será usado como justificativa da despesa. Edite se
+          necessário.
         </p>
       </div>
     </div>

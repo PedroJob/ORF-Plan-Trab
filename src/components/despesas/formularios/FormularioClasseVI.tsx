@@ -14,13 +14,21 @@ import {
   getNomeEquipamento,
 } from "@/lib/calculos/classeVI";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
-import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
+import type {
+  OperacaoWithEfetivo,
+  UserOM,
+  NaturezaSelect,
+  RateioNatureza,
+} from "@/types/despesas";
 
 interface FormularioClasseVIProps {
   value: ParametrosClasseVI | null;
   onChange: (params: HandleParametrosChange) => void;
   operacao: OperacaoWithEfetivo;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
+  naturezas: NaturezaSelect[];
+  rateioNaturezas: RateioNatureza[];
 }
 
 const FATOR_SEGURANCA = 1.1;
@@ -30,6 +38,9 @@ export function FormularioClasseVI({
   onChange,
   operacao,
   userOm,
+  planoOm,
+  naturezas,
+  rateioNaturezas,
 }: FormularioClasseVIProps) {
   const [equipamentos, setEquipamentos] = useState<ItemEquipamentoEngenharia[]>(
     value?.equipamentos || []
@@ -64,6 +75,15 @@ export function FormularioClasseVI({
 
   const equipamentosDisponiveis = listarTodosEquipamentos();
 
+  // Mapear naturezas selecionadas para códigos
+  const getNaturezasCodigos = () => {
+    return rateioNaturezas
+      .map(
+        (rateio) => naturezas.find((n) => n.id === rateio.naturezaId)?.codigo
+      )
+      .filter((codigo): codigo is string => codigo !== undefined);
+  };
+
   useEffect(() => {
     calcular();
   }, [equipamentos]);
@@ -78,8 +98,9 @@ export function FormularioClasseVI({
     try {
       const resultado = calcularClasseVI(
         { equipamentos },
-        userOm?.sigla,
-        operacao.nome
+        planoOm?.sigla,
+        operacao.nome,
+        getNaturezasCodigos()
       );
       setValorTotal(resultado.valorTotal);
       setCarimbo(resultado.carimbo);
@@ -312,6 +333,7 @@ export function FormularioClasseVI({
             </label>
             <div className="flex items-center gap-2">
               <input
+                disabled={categoriaSelecionada !== "OUTRO"}
                 type="number"
                 min="0.01"
                 step="0.01"
@@ -401,12 +423,17 @@ export function FormularioClasseVI({
           <div className="bg-white rounded p-2 text-xs text-gray-600">
             <p>
               <strong>Custo estimado:</strong> {quantidade} × R${" "}
-              {custoHora.toFixed(2)}/h × {diasUso} dias × {horasPorDia}h/dia × {FATOR_SEGURANCA} ={" "}
+              {custoHora.toFixed(2)}/h × {diasUso} dias × {horasPorDia}h/dia ×{" "}
+              {FATOR_SEGURANCA} ={" "}
               <span className="font-semibold text-green-700">
                 R${" "}
-                {(quantidade * custoHora * diasUso * horasPorDia * FATOR_SEGURANCA).toFixed(
-                  2
-                )}
+                {(
+                  quantidade *
+                  custoHora *
+                  diasUso *
+                  horasPorDia *
+                  FATOR_SEGURANCA
+                ).toFixed(2)}
               </span>
               {equipamentoSelecionadoInfo &&
                 custoHora !== equipamentoSelecionadoInfo.totalHora && (
@@ -477,11 +504,10 @@ export function FormularioClasseVI({
                         {item.quantidade}x {nomeEquip}
                       </p>
                       <p>
-                        R$ {custoHoraItem.toFixed(2)}/h × {item.diasUso} dias × {item.horasPorDia}h/dia × {FATOR_SEGURANCA}
+                        R$ {custoHoraItem.toFixed(2)}/h × {item.diasUso} dias ×{" "}
+                        {item.horasPorDia}h/dia × {FATOR_SEGURANCA}
                       </p>
-                      <p className="text-gray-500">
-                        (Total: {horasTotais}h)
-                      </p>
+                      <p className="text-gray-500">(Total: {horasTotais}h)</p>
                     </div>
                   </div>
 
@@ -522,6 +548,7 @@ export function FormularioClasseVI({
 
         <textarea
           value={carimbo || ""}
+          disabled={true}
           onChange={(e) => handleCarimboChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[150px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
           placeholder="A memória de cálculo será gerada automaticamente..."

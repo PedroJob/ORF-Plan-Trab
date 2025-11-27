@@ -57,6 +57,7 @@ interface DespesasLogisticoProps {
   canEdit: boolean;
   onRefresh?: () => void | Promise<void>;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
 }
 
 export function DespesasLogistico({
@@ -66,6 +67,7 @@ export function DespesasLogistico({
   canEdit,
   onRefresh,
   userOm,
+  planoOm,
 }: DespesasLogisticoProps) {
   const [loading, setLoading] = useState(true);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
@@ -436,6 +438,7 @@ export function DespesasLogistico({
           onSuccess={handleDespesaSuccess}
           despesaToEdit={despesaToEdit}
           userOm={userOm}
+          planoOm={planoOm}
         />
       )}
     </div>

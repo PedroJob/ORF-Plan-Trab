@@ -127,6 +127,12 @@ export async function POST(request: NextRequest) {
 
     const data = validation.data;
 
+    // Calcular dias totais de operação
+    const dataInicio = new Date(data.dataInicio);
+    const dataFinal = new Date(data.dataFinal);
+    const diffTime = dataFinal.getTime() - dataInicio.getTime();
+    const diasTotais = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir o dia inicial
+
     // Validar que soma dos valores das OMs não excede o limite total
     if (data.valorLimiteTotal && data.omsParticipantes && data.omsParticipantes.length > 0) {
       const somaValores = data.omsParticipantes.reduce((acc, om) => acc + om.valorLimite, 0);
@@ -150,8 +156,9 @@ export async function POST(request: NextRequest) {
         nome: data.nome,
         efetivoMil: data.efetivoMil,
         efetivoExt: data.efetivoExt || null,
-        dataInicio: new Date(data.dataInicio),
-        dataFinal: new Date(data.dataFinal),
+        dataInicio,
+        dataFinal,
+        diasTotais,
         prioridade: data.prioridade || Prioridade.MEDIA,
         status: StatusPlano.RASCUNHO,
         finalidade: data.finalidade,

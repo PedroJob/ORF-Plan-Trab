@@ -237,6 +237,7 @@ model Operacao {
   efetivoExt                 Int?               @map("efetivo_ext")
   dataInicio                 DateTime           @map("data_inicio")
   dataFinal                  DateTime           @map("data_final")
+  diasTotais                 Int                @default(1) @map("dias_totais")
   status                     StatusPlano        @default(RASCUNHO)
   prioridade                 Prioridade         @default(MEDIA)
   finalidade                 String?

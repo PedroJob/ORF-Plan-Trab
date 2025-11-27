@@ -112,7 +112,8 @@ export function listarTodosEquipamentos() {
 export function calcularClasseVII(
   params: ParametrosClasseVII,
   unidade?: string,
-  nomeOperacao?: string
+  nomeOperacao?: string,
+  naturezas?: string[]
 ) {
   const { equipamentos } = params;
 
@@ -144,7 +145,12 @@ export function calcularClasseVII(
   const operacaoTexto = nomeOperacao || "operação";
   const textoPadrao = `Aquisição de insumos para manutenção de equipamentos eletrônicos empregados durante a ${operacaoTexto}.`;
 
-  const detalhamento = `33.90.30 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+  // Usar naturezas dinâmicas ou fallback para padrão
+  const naturezasTexto = naturezas && naturezas.length > 0
+    ? naturezas.join(" e ")
+    : "33.90.30";
+
+  const detalhamento = `${naturezasTexto} – Destinado ao ${unidadeTexto}. ${textoPadrao}
 Memória de Cálculo:
 
 ${detalhamentoItens.join("\n")}

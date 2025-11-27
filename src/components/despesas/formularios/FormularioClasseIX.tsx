@@ -7,21 +7,32 @@ import {
   ParametrosClasseIX,
   ItemViatura,
   TipoViatura,
+  GrupoViatura,
   VIATURAS,
+  GRUPOS_VIATURA,
   calcularClasseIX,
   listarTodasViaturas,
   getCustoMntDiaEfetivo,
   getValorAcionamentoEfetivo,
   calcularCiclos30Dias,
+  getGrupoViatura,
 } from "@/lib/calculos/classeIX";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
-import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
+import type {
+  OperacaoWithEfetivo,
+  UserOM,
+  NaturezaSelect,
+  RateioNatureza,
+} from "@/types/despesas";
 
 interface FormularioClasseIXProps {
   value: ParametrosClasseIX | null;
   onChange: (params: HandleParametrosChange) => void;
   operacao: OperacaoWithEfetivo;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
+  naturezas: NaturezaSelect[];
+  rateioNaturezas: RateioNatureza[];
 }
 
 export function FormularioClasseIX({
@@ -29,6 +40,9 @@ export function FormularioClasseIX({
   onChange,
   operacao,
   userOm,
+  planoOm,
+  naturezas,
+  rateioNaturezas,
 }: FormularioClasseIXProps) {
   const diasTotaisOperacao = useMemo(() => {
     const inicio = new Date(operacao.dataInicio);
@@ -44,7 +58,8 @@ export function FormularioClasseIX({
 
   const [valorTotal, setValorTotal] = useState<number | null>(null);
   const [carimbo, setCarimbo] = useState<string>("");
-  const [carimboEditadoManualmente, setCarimboEditadoManualmente] = useState(false);
+  const [carimboEditadoManualmente, setCarimboEditadoManualmente] =
+    useState(false);
 
   const [tipoViaturaSelecionado, setTipoViaturaSelecionado] =
     useState<TipoViatura | null>(null);
@@ -57,9 +72,21 @@ export function FormularioClasseIX({
     "NAO_BLINDADA" | "BLINDADA" | "OUTRO"
   >("NAO_BLINDADA");
 
-  const [nomeViaturaCustomizado, setNomeViaturaCustomizado] = useState<string>("");
+  const [nomeViaturaCustomizado, setNomeViaturaCustomizado] =
+    useState<string>("");
+  const [grupoCustomizado, setGrupoCustomizado] =
+    useState<GrupoViatura>("GP1");
 
   const viaturasDisponiveis = listarTodasViaturas();
+
+  // Mapear naturezas selecionadas para códigos
+  const getNaturezasCodigos = () => {
+    return rateioNaturezas
+      .map(
+        (rateio) => naturezas.find((n) => n.id === rateio.naturezaId)?.codigo
+      )
+      .filter((codigo): codigo is string => codigo !== undefined);
+  };
 
   useEffect(() => {
     calcular();
@@ -75,8 +102,9 @@ export function FormularioClasseIX({
     try {
       const resultado = calcularClasseIX(
         { viaturas },
-        userOm?.sigla,
-        operacao.nome
+        planoOm?.sigla,
+        operacao.nome,
+        getNaturezasCodigos()
       );
       setValorTotal(resultado.valorTotal);
       setCarimbo(resultado.detalhamento);
@@ -96,7 +124,11 @@ export function FormularioClasseIX({
   const handleCarimboChange = (novoCarimbo: string) => {
     setCarimbo(novoCarimbo);
     setCarimboEditadoManualmente(true);
-    onChange({ params: { viaturas }, valor: valorTotal || 0, descricao: novoCarimbo });
+    onChange({
+      params: { viaturas },
+      valor: valorTotal || 0,
+      descricao: novoCarimbo,
+    });
   };
 
   const handleResetCarimbo = () => {
@@ -141,6 +173,7 @@ export function FormularioClasseIX({
       const novaViatura: ItemViatura = {
         tipoViatura: "OUTRO" as TipoViatura,
         nomeCustomizado: nomeViaturaCustomizado.trim(),
+        grupoCustomizado: grupoCustomizado,
         quantidade,
         diasUso,
         custoMntDiaCustomizado: custoMntDia,
@@ -150,7 +183,8 @@ export function FormularioClasseIX({
       setViaturas([...viaturas, novaViatura]);
     } else {
       // Para categorias padrão
-      const viaturaPadrao = VIATURAS[tipoViaturaSelecionado! as Exclude<TipoViatura, "OUTRO">];
+      const viaturaPadrao =
+        VIATURAS[tipoViaturaSelecionado! as Exclude<TipoViatura, "OUTRO">];
       const isCustoCustomizado = custoMntDia !== viaturaPadrao.custoMntDia;
       const isAcionamentoCustomizado =
         valorAcionamento !== viaturaPadrao.valorAcionamento;
@@ -167,7 +201,7 @@ export function FormularioClasseIX({
 
       setViaturas([...viaturas, novaViatura]);
     }
-    
+
     resetFormulario();
   };
 
@@ -178,25 +212,33 @@ export function FormularioClasseIX({
     setCustoMntDia(0);
     setValorAcionamento(0);
     setNomeViaturaCustomizado("");
+    setGrupoCustomizado("GP1");
   };
 
   const handleTipoViaturaChange = (tipo: TipoViatura | null) => {
     setTipoViaturaSelecionado(tipo);
     if (tipo && tipo !== "OUTRO") {
-      setCustoMntDia(VIATURAS[tipo as Exclude<TipoViatura, "OUTRO">].custoMntDia);
-      setValorAcionamento(VIATURAS[tipo as Exclude<TipoViatura, "OUTRO">].valorAcionamento);
+      setCustoMntDia(
+        VIATURAS[tipo as Exclude<TipoViatura, "OUTRO">].custoMntDia
+      );
+      setValorAcionamento(
+        VIATURAS[tipo as Exclude<TipoViatura, "OUTRO">].valorAcionamento
+      );
     } else {
       setCustoMntDia(0);
       setValorAcionamento(0);
     }
   };
 
-  const handleCategoriaChange = (categoria: "NAO_BLINDADA" | "BLINDADA" | "OUTRO") => {
+  const handleCategoriaChange = (
+    categoria: "NAO_BLINDADA" | "BLINDADA" | "OUTRO"
+  ) => {
     setCategoriaSelecionada(categoria);
     setTipoViaturaSelecionado(null);
     setCustoMntDia(0);
     setValorAcionamento(0);
     setNomeViaturaCustomizado("");
+    setGrupoCustomizado("GP1");
   };
 
   const removerViatura = (index: number) => {
@@ -215,9 +257,10 @@ export function FormularioClasseIX({
     return item.quantidade * custoUnitario;
   };
 
-  const viaturaSelecionadaInfo = tipoViaturaSelecionado && tipoViaturaSelecionado !== "OUTRO"
-    ? VIATURAS[tipoViaturaSelecionado as Exclude<TipoViatura, "OUTRO">]
-    : null;
+  const viaturaSelecionadaInfo =
+    tipoViaturaSelecionado && tipoViaturaSelecionado !== "OUTRO"
+      ? VIATURAS[tipoViaturaSelecionado as Exclude<TipoViatura, "OUTRO">]
+      : null;
 
   return (
     <div className="space-y-4">
@@ -227,11 +270,16 @@ export function FormularioClasseIX({
             Viaturas Adicionadas
           </label>
           {viaturas.map((item, index) => {
-            const viatura = item.tipoViatura !== "OUTRO" ? VIATURAS[item.tipoViatura as Exclude<TipoViatura, "OUTRO">] : null;
+            const viatura =
+              item.tipoViatura !== "OUTRO"
+                ? VIATURAS[item.tipoViatura as Exclude<TipoViatura, "OUTRO">]
+                : null;
             const custoMntDia = getCustoMntDiaEfetivo(item);
             const valorAcionamento = getValorAcionamentoEfetivo(item);
             const ciclos = calcularCiclos30Dias(item.diasUso);
             const custoItem = calcularCustoItem(item);
+            const grupo = getGrupoViatura(item);
+            const grupoTexto = GRUPOS_VIATURA[grupo];
             const isCustomizado =
               item.custoMntDiaCustomizado !== undefined ||
               item.valorAcionamentoCustomizado !== undefined;
@@ -243,13 +291,16 @@ export function FormularioClasseIX({
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800">
-                        {item.tipoViatura === "OUTRO" 
-                          ? "Outro" 
+                        {item.tipoViatura === "OUTRO"
+                          ? "Outro"
                           : viatura?.categoria === "BLINDADA"
                           ? "Blindada"
                           : "Não Blindada"}
+                      </span>
+                      <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                        {grupoTexto}
                       </span>
                       <span className="text-sm font-semibold text-gray-900">
                         R$ {custoItem.toFixed(2)}
@@ -262,7 +313,10 @@ export function FormularioClasseIX({
                     </div>
                     <div className="text-xs text-gray-600">
                       <p className="font-medium">
-                        {item.quantidade}x {item.tipoViatura === "OUTRO" ? (item.nomeCustomizado || "Viatura Customizada") : viatura?.nome}
+                        {item.quantidade}x{" "}
+                        {item.tipoViatura === "OUTRO"
+                          ? item.nomeCustomizado || "Viatura Customizada"
+                          : viatura?.nome}
                       </p>
                       <p>
                         Mnt: {item.diasUso} dias × R$ {custoMntDia.toFixed(2)}
@@ -346,18 +400,40 @@ export function FormularioClasseIX({
         </div>
 
         {categoriaSelecionada === "OUTRO" && (
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Nome da Viatura <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={nomeViaturaCustomizado}
-              onChange={(e) => setNomeViaturaCustomizado(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
-              placeholder="Ex: Caminhão Especial, Viatura XYZ..."
-            />
-          </div>
+          <>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Nome da Viatura <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={nomeViaturaCustomizado}
+                onChange={(e) => setNomeViaturaCustomizado(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                placeholder="Ex: Caminhão Especial, Viatura XYZ..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Grupo da Viatura <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={grupoCustomizado}
+                onChange={(e) =>
+                  setGrupoCustomizado(e.target.value as GrupoViatura)
+                }
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
+              >
+                {(Object.entries(GRUPOS_VIATURA) as [GrupoViatura, string][]).map(
+                  ([grupo, nome]) => (
+                    <option key={grupo} value={grupo}>
+                      {nome}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
+          </>
         )}
 
         {(viaturaSelecionadaInfo || categoriaSelecionada === "OUTRO") && (
@@ -369,6 +445,7 @@ export function FormularioClasseIX({
               </label>
               <div className="flex items-center gap-2">
                 <input
+                  disabled
                   type="number"
                   min="0.01"
                   step="0.01"
@@ -379,21 +456,23 @@ export function FormularioClasseIX({
                   className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
                   placeholder="0.00"
                 />
-                {viaturaSelecionadaInfo && custoMntDia !== viaturaSelecionadaInfo.custoMntDia && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCustoMntDia(viaturaSelecionadaInfo.custoMntDia)
-                    }
-                    className="text-xs text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
-                  >
-                    Restaurar padrão
-                  </button>
-                )}
+                {viaturaSelecionadaInfo &&
+                  custoMntDia !== viaturaSelecionadaInfo.custoMntDia && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustoMntDia(viaturaSelecionadaInfo.custoMntDia)
+                      }
+                      className="text-xs text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
+                    >
+                      Restaurar padrão
+                    </button>
+                  )}
               </div>
               {viaturaSelecionadaInfo && (
                 <p className="text-xs text-gray-500 mt-1">
-                  Valor padrão: R$ {viaturaSelecionadaInfo.custoMntDia.toFixed(2)}
+                  Valor padrão: R${" "}
+                  {viaturaSelecionadaInfo.custoMntDia.toFixed(2)}
                   /dia
                 </p>
               )}
@@ -405,6 +484,7 @@ export function FormularioClasseIX({
               </label>
               <div className="flex items-center gap-2">
                 <input
+                  disabled={categoriaSelecionada !== "OUTRO"}
                   type="number"
                   min="0.01"
                   step="0.01"
@@ -415,20 +495,21 @@ export function FormularioClasseIX({
                   className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-green-600 focus:border-transparent"
                   placeholder="0.00"
                 />
-                {viaturaSelecionadaInfo && valorAcionamento !==
-                  viaturaSelecionadaInfo.valorAcionamento && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setValorAcionamento(
-                        viaturaSelecionadaInfo.valorAcionamento
-                      )
-                    }
-                    className="text-xs text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
-                  >
-                    Restaurar padrão
-                  </button>
-                )}
+                {viaturaSelecionadaInfo &&
+                  valorAcionamento !==
+                    viaturaSelecionadaInfo.valorAcionamento && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setValorAcionamento(
+                          viaturaSelecionadaInfo.valorAcionamento
+                        )
+                      }
+                      className="text-xs text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
+                    >
+                      Restaurar padrão
+                    </button>
+                  )}
               </div>
               {viaturaSelecionadaInfo && (
                 <p className="text-xs text-gray-500 mt-1">
@@ -562,13 +643,15 @@ export function FormularioClasseIX({
 
         <textarea
           value={carimbo || ""}
+          disabled={true}
           onChange={(e) => handleCarimboChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
           placeholder="O carimbo será gerado automaticamente..."
         />
 
         <p className="text-xs text-gray-500">
-          Este texto será usado como justificativa da despesa. Edite se necessário.
+          Este texto será usado como justificativa da despesa. Edite se
+          necessário.
         </p>
       </div>
     </div>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { ArrowLeft, Plus, Trash2, Check, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Check, X, FileDown } from "lucide-react";
 import Link from "next/link";
 import { DespesasLogistico } from "@/components/despesas/DespesasLogistico";
 import { StatusAprovacao } from "@/components/planos/StatusAprovacao";
@@ -12,6 +12,7 @@ import { HistoricoAprovacoes } from "@/components/planos/HistoricoAprovacoes";
 import { DespesaWithRelations, UserOM } from "@/types/despesas";
 import { PlanoTrabalho, Prisma } from "@prisma/client";
 import { PlanoTrabalhoWithRelations } from "@/types/plano-trabalho";
+import { gerarPdfPlanoTrabalho, OpcoesPdf } from "@/lib/pdf/gerarPdfPlanoTrabalho";
 
 interface OM {
   id: string;
@@ -41,6 +42,14 @@ export default function PlanoTrabalhoPage() {
   const [showAddItem, setShowAddItem] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [userOm, setUserOm] = useState<UserOM | null>(null);
+
+  // Estado para modal de exportação PDF
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfOpcoes, setPdfOpcoes] = useState<OpcoesPdf>({
+    acoesRealizadas: "",
+    despesasOperacionais: "",
+  });
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Form state for new item
   const [newItem, setNewItem] = useState({
@@ -264,6 +273,36 @@ export default function PlanoTrabalhoPage() {
     }).format(value);
   };
 
+  const handleAbrirModalPdf = () => {
+    // Preencher com valores da operação como padrão
+    setPdfOpcoes({
+      acoesRealizadas: plano?.operacao.finalidade || "",
+      despesasOperacionais: plano?.operacao.motivacao || "",
+    });
+    setShowPdfModal(true);
+  };
+
+  const handleGerarPdf = async () => {
+    if (!plano) return;
+
+    setIsGeneratingPdf(true);
+    try {
+      // Buscar dados completos do plano com despesas
+      const response = await fetch(`/api/planos/${id}?incluirDespesas=true`);
+      if (!response.ok) {
+        throw new Error("Erro ao carregar dados do plano");
+      }
+      const planoCompleto = await response.json();
+      await gerarPdfPlanoTrabalho(planoCompleto, pdfOpcoes);
+      setShowPdfModal(false);
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      alert("Erro ao gerar PDF. Tente novamente.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -294,6 +333,10 @@ export default function PlanoTrabalhoPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="secondary" onClick={handleAbrirModalPdf}>
+              <FileDown className="w-4 h-4 mr-2" />
+              Exportar PDF
+            </Button>
             {plano.status === "RASCUNHO" && (
               <Button variant="primary" onClick={handleEnviarAnalise}>
                 <Check className="w-4 h-4 mr-2" />
@@ -390,6 +433,7 @@ export default function PlanoTrabalhoPage() {
             canEdit={plano.status === "RASCUNHO"}
             onRefresh={fetchData}
             userOm={userOm}
+            planoOm={plano.om ? { id: plano.om.id, nome: plano.om.nome, sigla: plano.om.sigla } : null}
           />
         ) : (
           <>
@@ -606,6 +650,90 @@ export default function PlanoTrabalhoPage() {
             status={plano.status}
           />
           <HistoricoAprovacoes planoId={id} />
+        </div>
+      )}
+
+      {/* Modal de Exportação PDF */}
+      {showPdfModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Exportar Plano de Trabalho
+                </h2>
+                <button
+                  onClick={() => setShowPdfModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-6">
+                Preencha as informações que serão incluídas no cabeçalho do PDF:
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    4. AÇÕES REALIZADAS OU A REALIZAR:
+                  </label>
+                  <textarea
+                    value={pdfOpcoes.acoesRealizadas || ""}
+                    onChange={(e) =>
+                      setPdfOpcoes({ ...pdfOpcoes, acoesRealizadas: e.target.value })
+                    }
+                    rows={4}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Ex: Ações referentes à montagem, aperfeiçoamento e operação das Bases..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    5. DESPESAS OPERACIONAIS REALIZADAS OU A REALIZAR:
+                  </label>
+                  <textarea
+                    value={pdfOpcoes.despesasOperacionais || ""}
+                    onChange={(e) =>
+                      setPdfOpcoes({ ...pdfOpcoes, despesasOperacionais: e.target.value })
+                    }
+                    rows={4}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Ex: Aquisição de Material e contratação de serviços necessários..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowPdfModal(false)}
+                  disabled={isGeneratingPdf}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleGerarPdf}
+                  disabled={isGeneratingPdf}
+                >
+                  {isGeneratingPdf ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <FileDown className="w-4 h-4 mr-2" />
+                      Gerar PDF
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { PreviewCalculo } from "../PreviewCalculo";
 import { Plus, X } from "lucide-react";
 import { HandleParametrosChange } from "../ModalCriarDespesa";
-import type { OperacaoWithEfetivo, UserOM } from "@/types/despesas";
+import type { OperacaoWithEfetivo, UserOM, NaturezaSelect, RateioNatureza } from "@/types/despesas";
 
 interface MaterialConstrucao {
   descricao: string;
@@ -21,6 +21,9 @@ interface FormularioClasseIVProps {
   onChange: (params: HandleParametrosChange) => void;
   operacao: OperacaoWithEfetivo;
   userOm: UserOM | null;
+  planoOm: UserOM | null;
+  naturezas: NaturezaSelect[];
+  rateioNaturezas: RateioNatureza[];
 }
 
 export function FormularioClasseIV({
@@ -28,6 +31,9 @@ export function FormularioClasseIV({
   onChange,
   operacao,
   userOm,
+  planoOm,
+  naturezas,
+  rateioNaturezas,
 }: FormularioClasseIVProps) {
   const [params, setParams] = useState<ParametrosClasseIV>(
     value || {
@@ -38,7 +44,15 @@ export function FormularioClasseIV({
   const [valorTotal, setValorTotal] = useState<number | null>(null);
   const [detalhes, setDetalhes] = useState<any>(null);
   const [carimbo, setCarimbo] = useState<string>("");
-  const [carimboEditadoManualmente, setCarimboEditadoManualmente] = useState(false);
+  const [carimboEditadoManualmente, setCarimboEditadoManualmente] =
+    useState(false);
+
+  // Mapear naturezas selecionadas para códigos
+  const getNaturezasCodigos = () => {
+    return rateioNaturezas
+      .map(rateio => naturezas.find(n => n.id === rateio.naturezaId)?.codigo)
+      .filter((codigo): codigo is string => codigo !== undefined);
+  };
 
   useEffect(() => {
     calcular();
@@ -74,21 +88,34 @@ export function FormularioClasseIV({
 
     const total = itensDetalhados.reduce((sum, item) => sum + item.subtotal, 0);
     const totalFinal = Number(total.toFixed(2));
-    const totalFormatado = `R$ ${totalFinal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const totalFormatado = `R$ ${totalFinal.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
 
     // Gerar memória de cálculo como string
     const memoriaCalculo = itensDetalhados
       .map(
         (item) =>
-          `→ ${item.descricao}: ${item.quantidade} x R$ ${item.valorUnitario.toFixed(2)} = R$ ${item.subtotal.toFixed(2)}`
+          `→ ${item.descricao}: ${
+            item.quantidade
+          } x R$ ${item.valorUnitario.toFixed(2)} = R$ ${item.subtotal.toFixed(
+            2
+          )}`
       )
       .join("\n");
 
-    const unidadeTexto = userOm?.sigla || "OM não identificada";
+    const unidadeTexto = planoOm?.sigla || "OM não identificada";
     const operacaoTexto = operacao.nome || "operação";
     const textoPadrao = `Aquisição de materiais de construção e engenharia para emprego no contexto da ${operacaoTexto}.`;
 
-    const carimboPadrao = `33.90.30 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+    // Usar naturezas selecionadas ou fallback
+    const naturezasCodigos = getNaturezasCodigos();
+    const naturezasTexto = naturezasCodigos.length > 0
+      ? naturezasCodigos.join(" e ")
+      : "33.90.30";
+
+    const carimboPadrao = `${naturezasTexto} – Destinado ao ${unidadeTexto}. ${textoPadrao}
 Memória de Cálculo:
 
 ${memoriaCalculo}
@@ -283,13 +310,15 @@ Total: ${totalFormatado}`;
 
         <textarea
           value={carimbo || ""}
+          disabled={true}
           onChange={(e) => handleCarimboChange(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm resize-y min-h-[200px] focus:ring-2 focus:ring-green-600 focus:border-transparent"
           placeholder="O carimbo será gerado automaticamente..."
         />
 
         <p className="text-xs text-gray-500">
-          Este texto será usado como justificativa da despesa. Edite se necessário.
+          Este texto será usado como justificativa da despesa. Edite se
+          necessário.
         </p>
       </div>
     </div>

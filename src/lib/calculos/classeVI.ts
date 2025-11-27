@@ -225,7 +225,8 @@ function gerarCarimbo(
   equipamentos: ItemEquipamentoEngenharia[],
   valorTotal: number,
   unidade?: string,
-  nomeOperacao?: string
+  nomeOperacao?: string,
+  naturezas?: string[]
 ): string {
   const totalFormatado = `R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const unidadeTexto = unidade || "OM não identificada";
@@ -249,7 +250,12 @@ function gerarCarimbo(
 
   memoriaCalculo += `Fator de Segurança: ${FATOR_SEGURANCA.toFixed(2)} (10%)`;
 
-  return `33.90.30 e 33.90.39 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+  // Usar naturezas dinâmicas ou fallback para padrão
+  const naturezasTexto = naturezas && naturezas.length > 0
+    ? naturezas.join(" e ")
+    : "33.90.30 e 33.90.39";
+
+  return `${naturezasTexto} – Destinado ao ${unidadeTexto}. ${textoPadrao}
 Memória de Cálculo:
 
 ${memoriaCalculo}
@@ -263,7 +269,8 @@ Total: ${totalFormatado}`;
 export function calcularClasseVI(
   params: ParametrosClasseVI,
   unidade?: string,
-  nomeOperacao?: string
+  nomeOperacao?: string,
+  naturezas?: string[]
 ): ResultadoClasseVI {
   if (!params.equipamentos || params.equipamentos.length === 0) {
     throw new Error("Deve haver pelo menos um equipamento");
@@ -286,7 +293,7 @@ export function calcularClasseVI(
   }
 
   const valorTotalFinal = Number(valorTotal.toFixed(2));
-  const carimbo = gerarCarimbo(params.equipamentos, valorTotalFinal, unidade, nomeOperacao);
+  const carimbo = gerarCarimbo(params.equipamentos, valorTotalFinal, unidade, nomeOperacao, naturezas);
 
   return {
     valorTotal: valorTotalFinal,

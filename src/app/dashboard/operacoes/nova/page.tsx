@@ -121,6 +121,10 @@ export default function NovaOperacaoPage() {
     setIsLoading(true);
 
     try {
+      // Criar datas ao meio-dia para evitar problemas de timezone
+      const dataInicioDate = new Date(formData.dataInicio + "T12:00:00");
+      const dataFinalDate = new Date(formData.dataFinal + "T12:00:00");
+
       const response = await fetch("/api/operacoes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -130,8 +134,8 @@ export default function NovaOperacaoPage() {
           efetivoExt: formData.efetivoExt
             ? parseInt(formData.efetivoExt)
             : undefined,
-          dataInicio: new Date(formData.dataInicio).toISOString(),
-          dataFinal: new Date(formData.dataFinal).toISOString(),
+          dataInicio: dataInicioDate.toISOString(),
+          dataFinal: dataFinalDate.toISOString(),
           valorLimiteTotal: formData.valorLimiteTotal
             ? parseFloat(formData.valorLimiteTotal)
             : undefined,

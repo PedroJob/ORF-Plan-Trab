@@ -7,15 +7,233 @@
 // Tipos de combustível
 export type TipoCombustivel = "OD" | "GAS";
 
-// Preços médios nacionais
+// Siglas dos estados brasileiros
+export type SiglaEstado =
+  | "br"
+  | "ac"
+  | "al"
+  | "am"
+  | "ap"
+  | "ba"
+  | "ce"
+  | "df"
+  | "es"
+  | "go"
+  | "ma"
+  | "mg"
+  | "ms"
+  | "mt"
+  | "pa"
+  | "pb"
+  | "pe"
+  | "pi"
+  | "pr"
+  | "rj"
+  | "rn"
+  | "ro"
+  | "rr"
+  | "rs"
+  | "sc"
+  | "se"
+  | "sp"
+  | "to";
+
+// Mapeamento de sigla para nome do estado
+export const ESTADOS_BRASIL: Record<SiglaEstado, string> = {
+  br: "Brasil (Média Nacional)",
+  ac: "Acre",
+  al: "Alagoas",
+  am: "Amazonas",
+  ap: "Amapá",
+  ba: "Bahia",
+  ce: "Ceará",
+  df: "Distrito Federal",
+  es: "Espírito Santo",
+  go: "Goiás",
+  ma: "Maranhão",
+  mg: "Minas Gerais",
+  ms: "Mato Grosso do Sul",
+  mt: "Mato Grosso",
+  pa: "Pará",
+  pb: "Paraíba",
+  pe: "Pernambuco",
+  pi: "Piauí",
+  pr: "Paraná",
+  rj: "Rio de Janeiro",
+  rn: "Rio Grande do Norte",
+  ro: "Rondônia",
+  rr: "Roraima",
+  rs: "Rio Grande do Sul",
+  sc: "Santa Catarina",
+  se: "Sergipe",
+  sp: "São Paulo",
+  to: "Tocantins",
+};
+
+// Interface para resposta da API de preços
+export interface PrecosCombustivelAPI {
+  gasolina: Partial<Record<SiglaEstado, string>>;
+  diesel: Partial<Record<SiglaEstado, string>>;
+  dataColeta?: string;
+}
+
+// Preços médios nacionais (fallback)
 export const PRECOS_COMBUSTIVEL = {
   GC: 6.3, // Gasolina Comum
   OD: 6.03, // Óleo Diesel
   GAS: 6.3, // Gasolina (genérico)
 };
 
+// Preços de fallback por estado (valores aproximados)
+export const PRECOS_FALLBACK: Record<TipoCombustivel, Partial<Record<SiglaEstado, number>>> = {
+  GAS: {
+    br: 6.16,
+    al: 6.22,
+    am: 6.97,
+    ce: 6.18,
+    df: 6.33,
+    es: 6.22,
+    go: 6.39,
+    ma: 5.83,
+    mt: 6.30,
+    mg: 5.98,
+    pr: 6.47,
+    pb: 5.91,
+    pa: 6.23,
+    pe: 6.33,
+    rs: 6.15,
+    rj: 6.08,
+    sc: 6.27,
+    sp: 6.03,
+  },
+  OD: {
+    br: 6.06,
+    al: 5.93,
+    am: 6.51,
+    ce: 5.83,
+    df: 5.98,
+    es: 6.04,
+    go: 6.06,
+    ma: 5.92,
+    mt: 6.32,
+    mg: 5.95,
+    pr: 5.98,
+    pa: 6.20,
+    pe: 5.82,
+    rs: 6.14,
+    rj: 6.15,
+    sc: 6.12,
+    sp: 6.12,
+  },
+};
+
 // Fator de segurança para Classe III (30%)
 export const FATOR_SEGURANCA_CLASSE_III = 1.3;
+
+// URL da API de preços de combustível
+const API_COMBUSTIVEL_URL = "https://combustivelapi.com.br/api/precos/";
+
+// Interface da resposta da API
+interface APIResponse {
+  error: boolean;
+  message: string;
+  data_coleta: string;
+  precos: {
+    gasolina: Record<string, string>;
+    diesel: Record<string, string>;
+  };
+}
+
+/**
+ * Converte string de preço brasileiro (ex: "6,16") para número
+ */
+function parsePreco(precoStr: string): number {
+  return parseFloat(precoStr.replace(",", "."));
+}
+
+/**
+ * Busca preços de combustível da API
+ */
+export async function fetchPrecosCombustivel(): Promise<PrecosCombustivelAPI | null> {
+  try {
+    const response = await fetch(API_COMBUSTIVEL_URL, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error("Erro ao buscar preços de combustível:", response.status);
+      return null;
+    }
+
+    const data: APIResponse = await response.json();
+
+    if (data.error) {
+      console.error("API retornou erro:", data.message);
+      return null;
+    }
+
+    return {
+      gasolina: data.precos.gasolina,
+      diesel: data.precos.diesel,
+      dataColeta: data.data_coleta,
+    };
+  } catch (error) {
+    console.error("Erro ao buscar preços de combustível:", error);
+    return null;
+  }
+}
+
+/**
+ * Obtém o preço do combustível para um estado específico
+ * Usa a API se disponível, senão usa fallback
+ */
+export function getPrecoEstado(
+  tipo: TipoCombustivel,
+  estado: SiglaEstado,
+  precosAPI?: PrecosCombustivelAPI | null
+): number {
+  // Se temos dados da API, usar eles
+  if (precosAPI) {
+    const precosEstado =
+      tipo === "GAS" ? precosAPI.gasolina : precosAPI.diesel;
+    const precoStr = precosEstado[estado];
+    if (precoStr) {
+      return parsePreco(precoStr);
+    }
+  }
+
+  // Fallback: usar preços estáticos
+  const precoFallback = PRECOS_FALLBACK[tipo][estado];
+  if (precoFallback) {
+    return precoFallback;
+  }
+
+  // Último fallback: média nacional
+  return tipo === "GAS" ? PRECOS_COMBUSTIVEL.GAS : PRECOS_COMBUSTIVEL.OD;
+}
+
+/**
+ * Lista estados disponíveis na API (com preços)
+ */
+export function getEstadosDisponiveis(
+  tipo: TipoCombustivel,
+  precosAPI?: PrecosCombustivelAPI | null
+): SiglaEstado[] {
+  const estadosBase = Object.keys(ESTADOS_BRASIL) as SiglaEstado[];
+
+  if (precosAPI) {
+    const precos = tipo === "GAS" ? precosAPI.gasolina : precosAPI.diesel;
+    return estadosBase.filter((estado) => precos[estado] !== undefined);
+  }
+
+  // Se não temos API, retornar estados do fallback
+  const fallback = PRECOS_FALLBACK[tipo];
+  return estadosBase.filter((estado) => fallback[estado] !== undefined);
+}
 
 // ============================================
 // VIATURAS
@@ -244,6 +462,8 @@ export interface ParametrosClasseIII {
   itens: ItemClasseIII[];
   tipoCombustivel: TipoCombustivel;
   precoCombustivelCustomizado?: number; // Preço customizado do combustível (opcional)
+  estadoSelecionado?: SiglaEstado; // Estado selecionado para referência de preço
+  dataColetaPreco?: string; // Data de coleta do preço da API
 }
 
 export interface ResultadoClasseIII {
@@ -328,7 +548,8 @@ function getNomeCombustivel(tipo: TipoCombustivel): string {
 export function calcularClasseIII(
   params: ParametrosClasseIII,
   unidade?: string,
-  nomeOperacao?: string
+  nomeOperacao?: string,
+  naturezas?: string[]
 ): ResultadoClasseIII {
   if (!params.itens || params.itens.length === 0) {
     throw new Error("Deve haver pelo menos um item (viatura ou equipamento)");
@@ -380,10 +601,18 @@ export function calcularClasseIII(
   const nomeCombustivel = getNomeCombustivel(params.tipoCombustivel);
   const unidadeTexto = unidade || "OM não identificada";
   const operacaoTexto = nomeOperacao || "operação";
-  const infoPreco = params.precoCombustivelCustomizado
-    ? `R$ ${precoPorLitro.toFixed(2)} (Preço Customizado)`
-    : `R$ ${precoPorLitro.toFixed(2)} (Preço Médio Nacional)`;
+
+  // Determinar texto do preço baseado no estado
+  const estadoTexto = params.estadoSelecionado
+    ? ESTADOS_BRASIL[params.estadoSelecionado]
+    : "Brasil (Média Nacional)";
+  const infoPreco = `R$ ${precoPorLitro.toFixed(2)} (Preço médio ${estadoTexto})`;
   const totalFormatado = `R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // Usar naturezas dinâmicas ou fallback para padrão
+  const naturezasTexto = naturezas && naturezas.length > 0
+    ? naturezas.join(" e ")
+    : "33.90.30";
 
   const textoPadrao = `Aquisição de ${nomeCombustivel} para custear deslocamento de viaturas e equipamentos no contexto da ${operacaoTexto}.`;
 
@@ -394,12 +623,17 @@ ${textoItens.join("\n")}
 Total: ${litrosTotais.toFixed(1)} L de ${nomeCombustivel} x ${FATOR_SEGURANCA_CLASSE_III} (Fator de segurança de 30%): ${litrosComFator.toFixed(1)} L
 Valor Total: ${litrosComFator.toFixed(1)} L de ${nomeCombustivel} x ${infoPreco} = ${totalFormatado}`;
 
-  const carimbo = `33.90.30 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+  // Gerar texto da fonte de preço
+  const fontePreco = params.dataColetaPreco
+    ? `\n\nFonte do preço: Petrobras (https://precos.petrobras.com.br/)\nData de coleta: ${params.dataColetaPreco}`
+    : "";
+
+  const carimbo = `${naturezasTexto} – Destinado ao ${unidadeTexto}. ${textoPadrao}
 Memória de Cálculo:
 
 ${memoriaCalculo}
 
-Total: ${totalFormatado}`;
+Total: ${totalFormatado}${fontePreco}`;
 
   return {
     valorTotal: Number(valorTotal.toFixed(2)),

@@ -128,12 +128,18 @@ function gerarDetalhamento(
   armamentos: ItemArmamento[],
   valorTotal: number,
   unidade?: string,
-  nomeOperacao?: string
+  nomeOperacao?: string,
+  naturezas?: string[]
 ): string {
   const totalFormatado = `R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const unidadeTexto = unidade || "OM não identificada";
   const operacaoTexto = nomeOperacao || "operação";
   const textoPadrao = `Aquisição de insumos para recuperação e reparação de armamentos empregados durante a ${operacaoTexto}.`;
+
+  // Usar naturezas dinâmicas ou fallback para padrão
+  const naturezasTexto = naturezas && naturezas.length > 0
+    ? naturezas.join(" e ")
+    : "33.90.30";
 
   let memoriaCalculo = "";
 
@@ -148,7 +154,7 @@ function gerarDetalhamento(
     memoriaCalculo += `  Subtotal: R$ ${custoItem.toFixed(2)}\n\n`;
   }
 
-  return `33.90.30 – Destinado ao ${unidadeTexto}. ${textoPadrao}
+  return `${naturezasTexto} – Destinado ao ${unidadeTexto}. ${textoPadrao}
 Memória de Cálculo:
 
 ${memoriaCalculo}
@@ -161,7 +167,8 @@ Total: ${totalFormatado}`;
 export function calcularClasseV(
   params: ParametrosClasseV,
   unidade?: string,
-  nomeOperacao?: string
+  nomeOperacao?: string,
+  naturezas?: string[]
 ): ResultadoClasseV {
   if (!params.armamentos || params.armamentos.length === 0) {
     throw new Error("Deve haver pelo menos um armamento");
@@ -185,7 +192,7 @@ export function calcularClasseV(
   }
 
   const valorTotalFinal = Number(valorTotal.toFixed(2));
-  const detalhamento = gerarDetalhamento(params.armamentos, valorTotalFinal, unidade, nomeOperacao);
+  const detalhamento = gerarDetalhamento(params.armamentos, valorTotalFinal, unidade, nomeOperacao, naturezas);
 
   return {
     valorTotal: valorTotalFinal,

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from "@prisma/client";
 
 // ============================================
 // PRISMA-DERIVED TYPES (Single source of truth)
@@ -52,6 +52,7 @@ export type OperacaoSelect = Prisma.OperacaoGetPayload<{
     efetivoExt: true;
     dataInicio: true;
     dataFinal: true;
+    diasTotais: true;
   };
 }>;
 
@@ -153,7 +154,10 @@ export interface DetalheCalculo {
  * Operacao type with efetivo field for backward compatibility
  * Maps efetivoMil to efetivo for components that expect it
  */
-export type OperacaoWithEfetivo = Omit<OperacaoSelect, 'efetivoMil' | 'efetivoExt' | 'dataInicio' | 'dataFinal'> & {
+export type OperacaoWithEfetivo = Omit<
+  OperacaoSelect,
+  "efetivoMil" | "efetivoExt" | "dataInicio" | "dataFinal"
+> & {
   efetivo: number;
   dataInicio: string;
   dataFinal: string;
@@ -177,64 +181,67 @@ export const classeSelectValidator = Prisma.validator<Prisma.ClasseSelect>()({
 /**
  * Validator for OM select
  */
-export const omSelectValidator = Prisma.validator<Prisma.OrganizacaoMilitarSelect>()({
-  id: true,
-  nome: true,
-  sigla: true,
-  codUG: true,
-});
+export const omSelectValidator =
+  Prisma.validator<Prisma.OrganizacaoMilitarSelect>()({
+    id: true,
+    nome: true,
+    sigla: true,
+    codUG: true,
+  });
 
 /**
  * Validator for Natureza select
  */
-export const naturezaSelectValidator = Prisma.validator<Prisma.NaturezaDespesaSelect>()({
-  id: true,
-  codigo: true,
-  nome: true,
-  descricao: true,
-});
+export const naturezaSelectValidator =
+  Prisma.validator<Prisma.NaturezaDespesaSelect>()({
+    id: true,
+    codigo: true,
+    nome: true,
+    descricao: true,
+  });
 
 /**
  * Type-safe include for despesa queries with all relations
  */
-export const despesaWithRelationsInclude = Prisma.validator<Prisma.DespesaInclude>()({
-  classe: {
-    select: {
-      nome: true,
-      descricao: true,
+export const despesaWithRelationsInclude =
+  Prisma.validator<Prisma.DespesaInclude>()({
+    classe: {
+      select: {
+        nome: true,
+        descricao: true,
+      },
     },
-  },
-  tipo: {
-    select: {
-      nome: true,
-      isCombustivel: true,
+    tipo: {
+      select: {
+        nome: true,
+        isCombustivel: true,
+      },
     },
-  },
-  oms: {
-    include: {
-      om: {
-        select: {
-          id: true,
-          nome: true,
-          sigla: true,
-          codUG: true,
+    oms: {
+      include: {
+        om: {
+          select: {
+            id: true,
+            nome: true,
+            sigla: true,
+            codUG: true,
+          },
         },
       },
     },
-  },
-  despesasNaturezas: {
-    include: {
-      natureza: {
-        select: {
-          id: true,
-          codigo: true,
-          nome: true,
-          descricao: true,
+    despesasNaturezas: {
+      include: {
+        natureza: {
+          select: {
+            id: true,
+            codigo: true,
+            nome: true,
+            descricao: true,
+          },
         },
       },
     },
-  },
-});
+  });
 
 // ============================================
 // HELPER FUNCTIONS
@@ -244,13 +251,16 @@ export const despesaWithRelationsInclude = Prisma.validator<Prisma.DespesaInclud
  * Transform OperacaoSelect to OperacaoWithEfetivo for backward compatibility
  * Maps database field efetivoMil to component field efetivo
  */
-export function transformOperacaoForComponent(op: OperacaoSelect): OperacaoWithEfetivo {
+export function transformOperacaoForComponent(
+  op: OperacaoSelect
+): OperacaoWithEfetivo {
   return {
     id: op.id,
     nome: op.nome,
     efetivo: op.efetivoMil,
     dataInicio: op.dataInicio.toISOString(),
     dataFinal: op.dataFinal.toISOString(),
+    diasTotais: op.diasTotais,
   };
 }
 
@@ -259,6 +269,6 @@ export function transformOperacaoForComponent(op: OperacaoSelect): OperacaoWithE
  */
 export function decimalToNumber(value: Prisma.Decimal | number | null): number {
   if (value === null) return 0;
-  if (typeof value === 'number') return value;
+  if (typeof value === "number") return value;
   return Number(value.toString());
 }

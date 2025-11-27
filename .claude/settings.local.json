@@ -15,7 +15,11 @@
       "Bash(find:*)",
       "Bash({} ;)",
       "Bash(npx tsc:*)",
-      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"sim\" npx prisma db push:*)"
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"sim\" npx prisma db push:*)",
+      "Bash(npm install:*)",
+      "Bash(yarn add:*)",
+      "Bash(mkdir:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
