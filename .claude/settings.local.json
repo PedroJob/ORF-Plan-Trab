@@ -10,7 +10,7 @@
       "Bash(git checkout:*)",
       "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"não resolveu, reinicie o banco de dados e rode as seeds\" npx prisma migrate reset --force)",
       "Bash(npx tsx prisma/seed.ts)",
-      "Bash(PGPASSWORD=opsmanager_password_change_in_production psql:*)",
+      "Bash(PGPASSWORD=sisptrab_password_change_in_production psql:*)",
       "Bash(npm run dev:*)",
       "Bash(find:*)",
       "Bash({} ;)",

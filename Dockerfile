@@ -1,5 +1,5 @@
 # ============================================
-# Multi-stage Dockerfile para OpsManager
+# Multi-stage Dockerfile para sisptrab
 # ============================================
 
 # Estágio 1: Dependências

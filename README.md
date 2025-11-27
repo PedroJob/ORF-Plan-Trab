@@ -1,4 +1,4 @@
-# OpsManager - Sistema de Gestão de Operações
+# sisptrab - Sistema de Gestão de Operações
 
 Sistema web completo para gerenciamento de operações militares, planos de trabalho logísticos e workflow de aprovações.
 
@@ -16,11 +16,13 @@ Sistema web completo para gerenciamento de operações militares, planos de trab
 ## 📋 Pré-requisitos
 
 ### Opção 1: Instalação Local
+
 - Node.js 18+
 - PostgreSQL 14+
 - npm ou yarn
 
 ### Opção 2: Docker (Recomendado)
+
 - Docker 20.10+
 - Docker Compose 2.0+
 
@@ -34,7 +36,7 @@ docker-compose -f docker-compose.dev.yml up -d postgres
 
 # 2. Configurar e iniciar app
 cp .env.example .env
-# Edite .env com: DATABASE_URL="postgresql://opsmanager:dev_password@localhost:5432/opsmanager"
+# Edite .env com: DATABASE_URL="postgresql://sisptrab:dev_password@localhost:5432/sisptrab"
 npm install
 npm run db:migrate
 npm run db:seed
@@ -64,7 +66,7 @@ npm install
 Crie um banco PostgreSQL:
 
 ```sql
-CREATE DATABASE opsmanager;
+CREATE DATABASE sisptrab;
 ```
 
 ### 4. Configure as variáveis de ambiente
@@ -79,7 +81,7 @@ Edite o arquivo `.env`:
 
 ```env
 # Database
-DATABASE_URL="postgresql://usuario:senha@localhost:5432/opsmanager?schema=public"
+DATABASE_URL="postgresql://usuario:senha@localhost:5432/sisptrab?schema=public"
 
 # JWT Secret (IMPORTANTE: Mude isso em produção!)
 JWT_SECRET="sua-chave-secreta-super-segura-aqui"
@@ -100,8 +102,8 @@ npx prisma generate
 Crie um arquivo `prisma/seed.ts`:
 
 ```typescript
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -109,55 +111,55 @@ async function main() {
   // Criar OM de exemplo
   const coter = await prisma.organizacaoMilitar.create({
     data: {
-      nome: 'Comando de Operações Terrestres',
-      sigla: 'COTER',
-      tipo: 'COTER',
-      codUG: '160548',
+      nome: "Comando de Operações Terrestres",
+      sigla: "COTER",
+      tipo: "COTER",
+      codUG: "160548",
     },
   });
 
   const cma = await prisma.organizacaoMilitar.create({
     data: {
-      nome: 'Comando Militar da Amazônia',
-      sigla: 'CMA',
-      tipo: 'CMA',
-      codUG: '160016',
+      nome: "Comando Militar da Amazônia",
+      sigla: "CMA",
+      tipo: "CMA",
+      codUG: "160016",
       omPaiId: coter.id,
     },
   });
 
   const brigada = await prisma.organizacaoMilitar.create({
     data: {
-      nome: '1ª Brigada de Infantaria de Selva',
-      sigla: '1ª Bda Inf Sl',
-      tipo: 'BRIGADA',
-      codUG: '160482',
+      nome: "1ª Brigada de Infantaria de Selva",
+      sigla: "1ª Bda Inf Sl",
+      tipo: "BRIGADA",
+      codUG: "160482",
       omPaiId: cma.id,
     },
   });
 
   const batalhao = await prisma.organizacaoMilitar.create({
     data: {
-      nome: '6º Batalhão de Engenharia de Construção',
-      sigla: '6º BEC',
-      tipo: 'BATALHAO',
-      codUG: '160353',
+      nome: "6º Batalhão de Engenharia de Construção",
+      sigla: "6º BEC",
+      tipo: "BATALHAO",
+      codUG: "160353",
       omPaiId: brigada.id,
     },
   });
 
   // Criar usuário super admin
-  const passwordHash = await bcrypt.hash('admin123', 10);
+  const passwordHash = await bcrypt.hash("admin123", 10);
 
   const admin = await prisma.user.create({
     data: {
-      email: 'admin@eb.mil.br',
+      email: "admin@eb.mil.br",
       passwordHash,
-      nomeCompleto: 'Administrador do Sistema',
-      nomeGuerra: 'Admin',
-      postoGraduacao: 'Gen Div',
-      telefone: '(92) 3659-1174',
-      role: 'SUPER_ADMIN',
+      nomeCompleto: "Administrador do Sistema",
+      nomeGuerra: "Admin",
+      postoGraduacao: "Gen Div",
+      telefone: "(92) 3659-1174",
+      role: "SUPER_ADMIN",
       isActive: true,
       omId: coter.id,
     },
@@ -165,16 +167,16 @@ async function main() {
 
   // Criar naturezas de despesa
   const naturezas = [
-    { codigo: 'GND-3-01', nome: 'Gêneros Alimentícios' },
-    { codigo: 'GND-3-02', nome: 'Combustível' },
-    { codigo: 'GND-3-03', nome: 'Manutenção de Comunicações/TI' },
-    { codigo: 'GND-3-04', nome: 'Manutenção de Viaturas' },
-    { codigo: 'GND-3-05', nome: 'Suprimento de Fundos' },
-    { codigo: 'GND-3-06', nome: 'Diárias' },
-    { codigo: 'GND-3-07', nome: 'Passagens' },
-    { codigo: 'GND-3-08', nome: 'Locação de Veículos' },
-    { codigo: 'GND-3-09', nome: 'Manutenção de Ar Condicionado' },
-    { codigo: 'GND-3-10', nome: 'Telecomunicações' },
+    { codigo: "GND-3-01", nome: "Gêneros Alimentícios" },
+    { codigo: "GND-3-02", nome: "Combustível" },
+    { codigo: "GND-3-03", nome: "Manutenção de Comunicações/TI" },
+    { codigo: "GND-3-04", nome: "Manutenção de Viaturas" },
+    { codigo: "GND-3-05", nome: "Suprimento de Fundos" },
+    { codigo: "GND-3-06", nome: "Diárias" },
+    { codigo: "GND-3-07", nome: "Passagens" },
+    { codigo: "GND-3-08", nome: "Locação de Veículos" },
+    { codigo: "GND-3-09", nome: "Manutenção de Ar Condicionado" },
+    { codigo: "GND-3-10", nome: "Telecomunicações" },
   ];
 
   for (const nat of naturezas) {
@@ -183,10 +185,10 @@ async function main() {
     });
   }
 
-  console.log('✅ Dados iniciais criados com sucesso!');
-  console.log('');
-  console.log('📧 Email: admin@eb.mil.br');
-  console.log('🔑 Senha: admin123');
+  console.log("✅ Dados iniciais criados com sucesso!");
+  console.log("");
+  console.log("📧 Email: admin@eb.mil.br");
+  console.log("🔑 Senha: admin123");
 }
 
 main()
@@ -254,28 +256,33 @@ ORF/
 ## 👥 Roles e Permissões
 
 ### SUPER_ADMIN
+
 - Acesso total ao sistema
 - Gerenciar usuários
 - Ver todas as operações e planos
 - Aprovar em qualquer nível
 
 ### CMT_CMA
+
 - Comandante de Comando Militar de Área
 - Ver operações da sua CMA e subordinados
 - Aprovar planos no nível CMA
 
 ### CMT_BRIGADA
+
 - Comandante de Brigada
 - Ver operações da sua Brigada e subordinados
 - Aprovar planos no nível Brigada
 
 ### CMT_OM
+
 - Comandante de OM
 - Ver operações apenas da sua OM
 - Aprovar planos no nível OM
 - Criar operações
 
 ### INTEGRANTE_CMA / INTEGRANTE_OM
+
 - Ver operações da sua OM
 - Criar planos de trabalho
 - Editar planos em rascunho
@@ -333,18 +340,21 @@ O sistema utiliza PostgreSQL com Prisma ORM. Principais entidades:
 ## 🔍 Funcionalidades Principais
 
 ### 1. Gestão de Operações
+
 - Criar operação com nome, efetivo, período
 - Campos descritivos: finalidade, motivação, consequências
 - Vincular à OM responsável
 - Controle de prioridade
 
 ### 2. Planos de Trabalho
+
 - Vinculado a uma operação
 - Versionamento automático
 - Responsável definido
 - Workflow de status
 
 ### 3. Itens Financeiros (Matriz)
+
 - OM específica por item
 - Natureza de despesa
 - Valor unitário, quantidade e total
@@ -352,12 +362,14 @@ O sistema utiliza PostgreSQL com Prisma ORM. Principais entidades:
 - Totalização automática
 
 ### 4. Aprovações
+
 - Hierarquia automática (OM → Brigada → CMA → COTER)
 - Registro de quem aprovou/reprovou e quando
 - Motivo obrigatório para reprovação
 - Histórico completo
 
 ### 5. Auditoria
+
 - Log de criação, edição, aprovação, reprovação
 - Metadados em JSON para rastreabilidade
 - Timestamp automático
@@ -405,7 +417,7 @@ npm run build
 
 # Iniciar com PM2
 npm install -g pm2
-pm2 start npm --name "opsmanager" -- start
+pm2 start npm --name "sisptrab" -- start
 
 # Configurar nginx como reverse proxy
 ```

@@ -6,52 +6,52 @@ services:
   # ============================================
   postgres:
     image: postgres:16-alpine
-    container_name: opsmanager-db
+    container_name: sisptrab-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-opsmanager}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-opsmanager_password_change_in_production}
-      POSTGRES_DB: ${DB_NAME:-opsmanager}
+      POSTGRES_USER: ${DB_USER:-sisptrab}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sisptrab_password_change_in_production}
+      POSTGRES_DB: ${DB_NAME:-sisptrab}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - opsmanager-network
+      - sisptrab-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-opsmanager} -d ${DB_NAME:-opsmanager}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sisptrab} -d ${DB_NAME:-sisptrab}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   # ============================================
-  # OpsManager Application
+  # sisptrab Application
   # ============================================
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: opsmanager-app
+    container_name: sisptrab-app
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://${DB_USER:-opsmanager}:${DB_PASSWORD:-opsmanager_password_change_in_production}@postgres:5432/${DB_NAME:-opsmanager}?schema=public
+      - DATABASE_URL=postgresql://${DB_USER:-sisptrab}:${DB_PASSWORD:-sisptrab_password_change_in_production}@postgres:5432/${DB_NAME:-sisptrab}?schema=public
       - JWT_SECRET=${JWT_SECRET:-change-this-to-a-secure-random-string-in-production}
       - NEXT_PUBLIC_APP_URL=${APP_URL:-http://localhost:3000}
     ports:
       - "${APP_PORT:-3000}:3000"
     networks:
-      - opsmanager-network
+      - sisptrab-network
 
 # ============================================
 # Networks
 # ============================================
 networks:
-  opsmanager-network:
+  sisptrab-network:
     driver: bridge
 
 # ============================================

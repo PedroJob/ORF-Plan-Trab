@@ -1,4 +1,4 @@
-# 🚀 Guia de Inicialização Rápida - OpsManager
+# 🚀 Guia de Inicialização Rápida - sisptrab
 
 Este guia mostra como colocar o sistema no ar em poucos minutos.
 
@@ -20,15 +20,15 @@ npm install
 
 ### 2️⃣ Configurar Banco de Dados
 
-Crie um banco PostgreSQL chamado `opsmanager`:
+Crie um banco PostgreSQL chamado `sisptrab`:
 
 ```bash
 # No PostgreSQL
-createdb opsmanager
+createdb sisptrab
 
 # Ou via psql
 psql -U postgres
-CREATE DATABASE opsmanager;
+CREATE DATABASE sisptrab;
 \q
 ```
 
@@ -43,7 +43,7 @@ cp .env.example .env
 Edite o arquivo `.env` e configure:
 
 ```env
-DATABASE_URL="postgresql://usuario:senha@localhost:5432/opsmanager?schema=public"
+DATABASE_URL="postgresql://usuario:senha@localhost:5432/sisptrab?schema=public"
 JWT_SECRET="sua-chave-secreta-aqui-mude-em-producao"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
@@ -74,34 +74,42 @@ Pronto! Acesse: **http://localhost:3000**
 Após executar o seed, você pode fazer login com:
 
 ### Super Administrador
+
 - **Email:** admin@eb.mil.br
 - **Senha:** admin123
 
 ### Comandante CMA
+
 - **Email:** cmt.cma@eb.mil.br
 - **Senha:** senha123
 
 ### Comandante Brigada
+
 - **Email:** cmt.brigada@eb.mil.br
 - **Senha:** senha123
 
 ### Comandante OM (6º BEC)
+
 - **Email:** cmt.bec@eb.mil.br
 - **Senha:** senha123
 
 ### Integrante OM
+
 - **Email:** integrante@eb.mil.br
 - **Senha:** senha123
 
 ## 🎯 Testando o Sistema
 
 ### 1. Fazer Login
+
 Acesse http://localhost:3000/login e faça login com qualquer uma das credenciais acima.
 
 ### 2. Explorar Dashboard
+
 Veja as estatísticas e operações criadas.
 
 ### 3. Criar um Plano de Trabalho
+
 1. Vá em "Operações"
 2. Clique na Operação CATRIMANI II (já criada pelo seed)
 3. Clique em "Novo Plano de Trabalho"
@@ -109,6 +117,7 @@ Veja as estatísticas e operações criadas.
 5. Adicione itens financeiros
 
 ### 4. Testar Workflow de Aprovações
+
 1. Como Integrante OM, crie um plano e envie para análise
 2. Faça logout
 3. Faça login como Comandante OM
@@ -150,18 +159,20 @@ Acesse: http://localhost:5555
 **Causa:** PostgreSQL não está rodando ou credenciais erradas no `.env`
 
 **Solução:**
+
 ```bash
 # Verificar se PostgreSQL está rodando
 brew services list | grep postgresql  # macOS
 systemctl status postgresql           # Linux
 
 # Testar conexão
-psql -U seu_usuario -d opsmanager
+psql -U seu_usuario -d sisptrab
 ```
 
 ### Erro: "P3009: migrate.lock is missing"
 
 **Solução:**
+
 ```bash
 rm -rf prisma/migrations
 npm run db:migrate
@@ -170,6 +181,7 @@ npm run db:migrate
 ### Erro de portas em uso
 
 **Solução:**
+
 ```bash
 # Mudar porta no package.json ou matar processo
 lsof -ti:3000 | xargs kill -9  # macOS/Linux
@@ -178,6 +190,7 @@ lsof -ti:3000 | xargs kill -9  # macOS/Linux
 ### Erro: "Module not found: Can't resolve..."
 
 **Solução:**
+
 ```bash
 rm -rf node_modules package-lock.json
 npm install
