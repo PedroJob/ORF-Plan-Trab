@@ -9,9 +9,9 @@ services:
     container_name: sisptrab-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-sisptrab}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-sisptrab_password_change_in_production}
-      POSTGRES_DB: ${DB_NAME:-sisptrab}
+      POSTGRES_USER: sisptrab_user
+      POSTGRES_PASSWORD: sisptrab_db123
+      POSTGRES_DB: sisptrab
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "${DB_PORT:-5432}:5432"
@@ -20,7 +20,7 @@ services:
     networks:
       - sisptrab-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sisptrab} -d ${DB_NAME:-sisptrab}"]
+      test: ["CMD-SHELL", "pg_isready -U sisptrab_user -d sisptrab"]
       interval: 10s
       timeout: 5s
       retries: 5
