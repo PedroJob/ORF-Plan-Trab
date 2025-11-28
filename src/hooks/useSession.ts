@@ -1,11 +1,20 @@
-import { Prisma } from "@prisma/client";
 import { useEffect, useState } from "react";
 
-export type SessionUser = Prisma.UserGetPayload<{
-  include: {
-    om: true;
+export interface SessionUser {
+  id: string;
+  email: string;
+  nomeCompleto: string;
+  nomeGuerra: string | null;
+  postoGraduacao: string;
+  role: string;
+  om: {
+    id: string;
+    nome: string;
+    sigla: string;
+    tipo: string;
+    omPaiId: string | null;
   };
-}>;
+}
 
 export interface UseSessionReturn {
   user: SessionUser | null;

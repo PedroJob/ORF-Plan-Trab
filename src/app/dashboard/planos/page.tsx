@@ -129,7 +129,7 @@ export default function PlanosPage() {
   };
 
   const filteredPlanos = statusFilter
-    ? planos.filter((p) => p.status === statusFilter && p.omId === user?.omId)
+    ? planos.filter((p) => p.status === statusFilter)
     : planos;
 
   if (isLoading) {

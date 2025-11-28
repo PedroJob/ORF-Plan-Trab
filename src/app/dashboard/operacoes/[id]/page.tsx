@@ -15,10 +15,14 @@ import {
   DollarSign,
   CheckCircle2,
   Clock,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useSession } from "@/hooks/useSession";
+import { ModalOmsSubordinadas } from "@/components/operacoes/ModalOmsSubordinadas";
+import { gerarPdfPlanoTrabalho } from "@/lib/pdf/gerarPdfPlanoTrabalho";
 
 interface OMParticipante {
   id: string;
@@ -84,12 +88,41 @@ export default function OperacaoDetailPage() {
   const [operacao, setOperacao] = useState<Operacao | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedOmForModal, setSelectedOmForModal] = useState<{
+    id: string;
+    nome: string;
+    sigla: string;
+  } | null>(null);
+  const [subordinadasCount, setSubordinadasCount] = useState<
+    Record<string, number>
+  >({});
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   useEffect(() => {
     if (id) {
       fetchOperacao();
     }
   }, [id]);
+
+  // Buscar contagem de subordinadas para cada OM participante
+  useEffect(() => {
+    if (operacao?.omsParticipantes) {
+      operacao.omsParticipantes.forEach(async (omPart) => {
+        try {
+          const response = await fetch(`/api/oms/${omPart.om.id}/subordinadas`);
+          if (response.ok) {
+            const data = await response.json();
+            setSubordinadasCount((prev) => ({
+              ...prev,
+              [omPart.om.id]: data.subordinadas?.length || 0,
+            }));
+          }
+        } catch (error) {
+          console.error("Erro ao buscar subordinadas:", error);
+        }
+      });
+    }
+  }, [operacao?.omsParticipantes]);
 
   const fetchOperacao = async () => {
     try {
@@ -165,6 +198,36 @@ export default function OperacaoDetailPage() {
     });
   };
 
+  const handleGerarPdf = async () => {
+    if (!operacao || operacao.planosTrabalho.length === 0) {
+      alert("Não há planos de trabalho para gerar o PDF");
+      return;
+    }
+
+    setGeneratingPdf(true);
+    try {
+      const response = await fetch(`/api/operacoes/${id}/planos`);
+
+      if (!response.ok) {
+        throw new Error("Erro ao buscar planos");
+      }
+
+      const { planos, operacao: operacaoCompleta } = await response.json();
+
+      if (planos.length === 0) {
+        alert("Nenhum plano de trabalho encontrado");
+        return;
+      }
+
+      await gerarPdfPlanoTrabalho(planos, operacaoCompleta);
+    } catch (err) {
+      console.error("Erro ao gerar PDF:", err);
+      alert("Erro ao gerar PDF. Tente novamente.");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   // Calcular valor total utilizado (soma dos planos)
   const valorTotalUtilizado =
     operacao?.planosTrabalho.reduce(
@@ -236,6 +299,26 @@ export default function OperacaoDetailPage() {
             >
               {operacao.status.replace("_", " ")}
             </span>
+            {operacao.planosTrabalho.length > 0 && (
+              <Button
+                variant="secondary"
+                onClick={handleGerarPdf}
+                disabled={generatingPdf}
+                className="bg-military-50 text-military-700 hover:bg-military-100 border-military-200"
+              >
+                {generatingPdf ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Gerar PDF
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               variant="secondary"
               onClick={handleDelete}
@@ -333,32 +416,53 @@ export default function OperacaoDetailPage() {
           </h2>
           <div className="space-y-3">
             {operacao.omsParticipantes.map((omPart) => {
-              const canCreatePlano = omPart.omId === user?.om.id;
               const plano = getPlanoByOm(omPart.omId);
-              const valorUtilizado = plano
-                ? Number(plano.valorTotalDespesas) || 0
-                : 0;
-              const percentual =
-                Number(omPart.valorLimite) > 0
-                  ? (valorUtilizado / Number(omPart.valorLimite)) * 100
-                  : 0;
+              const hasSubordinadas =
+                (subordinadasCount[omPart.om.id] || 0) > 0;
+              const canCreatePlano =
+                omPart.omId === user?.om.id && !hasSubordinadas && !plano;
 
               return (
                 <div
                   key={omPart.id}
                   className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
                 >
-                  <div className="flex items-center gap-4">
-                    <Building2 className="w-8 h-8 text-military-600" />
-                    <div>
-                      <div className="font-medium text-military-900">
-                        {omPart.om.sigla} - {omPart.om.nome}
+                  {hasSubordinadas ? (
+                    <button
+                      onClick={() =>
+                        setSelectedOmForModal({
+                          id: omPart.om.id,
+                          nome: omPart.om.nome,
+                          sigla: omPart.om.sigla,
+                        })
+                      }
+                      className="flex items-center gap-4 text-left hover:bg-gray-100 rounded-lg p-2 -m-2 transition-colors"
+                    >
+                      <Building2 className="w-8 h-8 text-military-600" />
+                      <div>
+                        <div className="font-medium text-military-900 flex items-center gap-2">
+                          {omPart.om.sigla} - {omPart.om.nome}
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </div>
+                        <div className="text-sm text-olive-600">
+                          Tipo: {omPart.om.tipo} -{" "}
+                          {subordinadasCount[omPart.om.id]} subordinada(s)
+                        </div>
                       </div>
-                      <div className="text-sm text-olive-600">
-                        Tipo: {omPart.om.tipo}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-4">
+                      <Building2 className="w-8 h-8 text-military-600" />
+                      <div>
+                        <div className="font-medium text-military-900">
+                          {omPart.om.sigla} - {omPart.om.nome}
+                        </div>
+                        <div className="text-sm text-olive-600">
+                          Tipo: {omPart.om.tipo}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="flex items-center gap-6">
                     <div className="text-right">
@@ -367,21 +471,6 @@ export default function OperacaoDetailPage() {
                         {formatCurrency(Number(omPart.valorLimite))}
                       </div>
                     </div>
-
-                    <div className="text-right">
-                      <div className="text-sm text-olive-600">Utilizado</div>
-                      <div
-                        className={`font-semibold ${
-                          percentual > 100
-                            ? "text-red-600"
-                            : "text-military-900"
-                        }`}
-                      >
-                        {formatCurrency(valorUtilizado)} (
-                        {percentual.toFixed(1)}%)
-                      </div>
-                    </div>
-
                     <div className="w-32">
                       {plano ? (
                         <Link href={`/dashboard/planos/${plano.id}`}>
@@ -404,7 +493,7 @@ export default function OperacaoDetailPage() {
                         <Link
                           href={`/dashboard/planos/novo?operacaoId=${operacao.id}`}
                         >
-                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-200 text-gray-600 hover:bg-gray-300">
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-military-600 text-white hover:bg-military-700">
                             <Plus className="w-4 h-4" />
                             <span className="text-sm font-medium">
                               Criar Plano
@@ -477,6 +566,22 @@ export default function OperacaoDetailPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Modal de OMs Subordinadas */}
+      {selectedOmForModal && (
+        <ModalOmsSubordinadas
+          isOpen={!!selectedOmForModal}
+          onClose={() => setSelectedOmForModal(null)}
+          omParticipante={selectedOmForModal}
+          operacaoId={operacao.id}
+          planosTrabalho={operacao.planosTrabalho.map((p) => ({
+            id: p.id,
+            omId: p.omId,
+            status: p.status,
+          }))}
+          userOmId={user?.om.id}
+        />
       )}
     </div>
   );

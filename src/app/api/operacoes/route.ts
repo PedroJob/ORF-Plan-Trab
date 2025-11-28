@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { canCreateOperacao, canViewAllPlanos } from '@/lib/permissions';
+import { validarOmsParticipantes } from '@/lib/validators/om-participante';
 import { z } from 'zod';
 import { StatusPlano, Prioridade, TipoEvento } from '@prisma/client';
 
@@ -143,6 +144,30 @@ export async function POST(request: NextRequest) {
             details: {
               valorLimiteTotal: data.valorLimiteTotal,
               somaValoresOMs: somaValores,
+            },
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validar que OMs participantes são filhas diretas de CMA
+    if (data.omsParticipantes && data.omsParticipantes.length > 0) {
+      const omIds = data.omsParticipantes.map((om) => om.omId);
+      const validacao = await validarOmsParticipantes(omIds);
+
+      if (!validacao.valid) {
+        // Buscar nomes das OMs inválidas para mensagem mais clara
+        const omsInvalidas = await prisma.organizacaoMilitar.findMany({
+          where: { id: { in: validacao.invalidOms } },
+          select: { sigla: true, nome: true },
+        });
+
+        return NextResponse.json(
+          {
+            error: 'Apenas OMs filhas diretas de CMA podem ser participantes de operações',
+            details: {
+              omsInvalidas: omsInvalidas.map((om) => `${om.sigla} - ${om.nome}`),
             },
           },
           { status: 400 }

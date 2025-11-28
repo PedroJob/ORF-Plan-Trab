@@ -37,6 +37,7 @@ export async function GET() {
         nome: user.om.nome,
         sigla: user.om.sigla,
         tipo: user.om.tipo,
+        omPaiId: user.om.omPaiId,
       },
     });
   } catch (error) {

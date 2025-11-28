@@ -159,7 +159,10 @@ export async function POST(
     // Verificar bloqueio (plano em análise)
     if (plano.status === "EM_ANALISE") {
       return NextResponse.json(
-        { error: "Plano em análise não pode ter despesas adicionadas. Aguardando aprovação." },
+        {
+          error:
+            "Plano em análise não pode ter despesas adicionadas. Aguardando aprovação.",
+        },
         { status: 403 }
       );
     }
@@ -169,16 +172,10 @@ export async function POST(
       where: { id: currentUser.userId },
     });
 
-    if (
-      !user ||
-      (plano.responsavelId !== user.id &&
-        !["S4", "COMANDANTE", "SUPER_ADMIN"].includes(
-          user.role
-        ))
-    ) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Sem permissão para adicionar despesas" },
-        { status: 403 }
+        { error: "Usuário não encontrado" },
+        { status: 404 }
       );
     }
 
@@ -384,7 +381,7 @@ export async function POST(
         metadados: {
           despesaId: despesa.id,
           classe: classe.nome,
-          tipo: tipo?.nome || 'Sem tipo',
+          tipo: tipo?.nome || "Sem tipo",
           valorTotal: valorTotal,
         },
       },

@@ -319,7 +319,7 @@ export async function gerarPdfPlanoTrabalho(
 
   const omPrincipal =
     planos.length > 1
-      ? "COMANDO MILITAR DA AMAZONIA"
+      ? "COMANDO MILITAR DA AMAZÔNIA"
       : opcoes?.omPrincipal ?? planos[0].om.nome.toUpperCase();
 
   doc.text(omPrincipal, pageWidth / 2, currentY, {

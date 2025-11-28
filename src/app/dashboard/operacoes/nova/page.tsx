@@ -45,11 +45,11 @@ export default function NovaOperacaoPage() {
     []
   );
 
-  // Carregar OMs disponíveis
+  // Carregar OMs elegíveis como participantes (filhas diretas de CMA)
   useEffect(() => {
     async function loadOms() {
       try {
-        const response = await fetch("/api/organizacoes");
+        const response = await fetch("/api/organizacoes/elegiveis-participantes");
         if (response.ok) {
           const data = await response.json();
           setOms(data);

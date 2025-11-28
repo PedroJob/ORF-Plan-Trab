@@ -6,6 +6,16 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "@/hooks/useSession";
+
+interface OMParticipante {
+  omId: string;
+  om: {
+    id: string;
+    nome: string;
+    sigla: string;
+  };
+}
 
 interface Operacao {
   id: string;
@@ -15,11 +25,13 @@ interface Operacao {
     nome: string;
     sigla: string;
   };
+  omsParticipantes: OMParticipante[];
 }
 
 export default function NovoPlanoPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [operacoes, setOperacoes] = useState<Operacao[]>([]);
@@ -32,11 +44,18 @@ export default function NovoPlanoPage() {
     tipo: "LOGISTICO",
     acoes: "",
     despesasOperacionais: "",
+    omId: searchParams.get("omId") || user?.om.id || "",
   });
 
   useEffect(() => {
     fetchOperacoes();
   }, []);
+
+  useEffect(() => {
+    if (user?.om.id && !formData.omId) {
+      setFormData((prev) => ({ ...prev, omId: user.om.id }));
+    }
+  }, [user?.om.id]);
 
   const fetchOperacoes = async () => {
     try {
@@ -49,6 +68,15 @@ export default function NovoPlanoPage() {
       setLoadingOperacoes(false);
     }
   };
+
+  // Filtrar operações onde a OM pai do usuário participa
+  const operacoesFiltradas = operacoes.filter((op) => {
+    if (!user?.om.omPaiId) return true;
+
+    return op.omsParticipantes.some(
+      (p) => p.omId === user.om.omPaiId || p.omId === user.om.id
+    );
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,16 +189,11 @@ export default function NovoPlanoPage() {
                 <div className="w-full px-3 py-2 border border-olive-300 rounded-lg bg-military-50 text-olive-700">
                   Carregando operações...
                 </div>
-              ) : operacoes.length === 0 ? (
+              ) : operacoesFiltradas.length === 0 ? (
                 <div className="space-y-2">
                   <div className="w-full px-3 py-2 border border-amber-300 rounded-lg bg-amber-50 text-amber-800">
-                    Nenhuma operação disponível
+                    Nenhuma operação disponível para sua OM
                   </div>
-                  <Link href="/dashboard/operacoes/nova">
-                    <Button type="button" variant="secondary" size="sm">
-                      Criar Nova Operação
-                    </Button>
-                  </Link>
                 </div>
               ) : (
                 <select
@@ -182,7 +205,7 @@ export default function NovoPlanoPage() {
                   required
                 >
                   <option value="">Selecione uma operação</option>
-                  {operacoes.map((op) => (
+                  {operacoesFiltradas.map((op) => (
                     <option key={op.id} value={op.id}>
                       {op.nome} ({op.om.sigla}) - {op.status}
                     </option>
@@ -201,7 +224,7 @@ export default function NovoPlanoPage() {
             <Button
               type="submit"
               isLoading={isLoading}
-              disabled={operacoes.length === 0}
+              disabled={operacoesFiltradas.length === 0}
             >
               Criar Plano de Trabalho
             </Button>

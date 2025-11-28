@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { canCreatePlanoTrabalho } from "@/lib/permissions";
+import {
+  canCreatePlanoTrabalho,
+  canFillPlanoTrabalho,
+} from "@/lib/permissions";
+import { getTodasOmsSubordinadas } from "@/lib/validators/om-participante";
 import { z } from "zod";
 import { StatusPlano, Prioridade, TipoEvento } from "@prisma/client";
 
@@ -9,6 +13,7 @@ const createPlanoSchema = z.object({
   operacaoId: z.string().cuid("ID de operação inválido"),
   titulo: z.string().min(1, "Título é obrigatório"),
   prioridade: z.nativeEnum(Prioridade).optional(),
+  omId: z.string().cuid("ID de OM inválido").optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -39,13 +44,14 @@ export async function GET(request: NextRequest) {
       whereClause.operacaoId = operacaoId;
     }
 
-    // Filtrar por OM se não for role que vê tudo (COMANDANTE e SUPER_ADMIN veem todos)
+    // Filtrar por OM se não for role que vê tudo
     if (!["SUPER_ADMIN"].includes(user.role)) {
-      // Usuário vê planos da sua OM ou de operações criadas pela sua OM
-      whereClause.OR = [
-        { omId: user.omId }, // Planos da OM do usuário
-        { operacao: { omId: user.omId } }, // Planos de operações criadas pela OM do usuário
-      ];
+      // Buscar OMs subordinadas ao usuário
+      const subordinadas = await getTodasOmsSubordinadas(user.omId);
+      const omsIds = [user.omId, ...subordinadas.map((s) => s.id)];
+
+      // Usuário vê planos da sua OM ou de OMs subordinadas
+      whereClause.omId = { in: omsIds };
     }
 
     const planos = await prisma.planoTrabalho.findMany({
@@ -162,15 +168,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se a OM do usuário participa da operação (se não for SUPER_ADMIN)
+    // Verificar se o usuário pode preencher plano para esta operação
+    // SUPER_ADMIN pode sempre criar
     if (user.role !== "SUPER_ADMIN") {
-      const omParticipates = operacao.omsParticipantes.some(
-        (p) => p.omId === user.omId
+      const canFill = await canFillPlanoTrabalho(
+        data.omId || user.omId,
+        data.operacaoId
       );
 
-      if (!omParticipates) {
+      if (!canFill.allowed) {
         return NextResponse.json(
-          { error: "Sua OM não participa desta operação" },
+          {
+            error:
+              canFill.reason || "Você não pode criar plano para esta operação",
+          },
           { status: 403 }
         );
       }
@@ -181,7 +192,7 @@ export async function POST(request: NextRequest) {
       where: {
         operacaoId_omId: {
           operacaoId: data.operacaoId,
-          omId: user.omId,
+          omId: data.omId || user.omId,
         },
       },
     });
@@ -210,7 +221,7 @@ export async function POST(request: NextRequest) {
         titulo: data.titulo,
         versao: nextVersion,
         operacaoId: data.operacaoId,
-        omId: user.omId,
+        omId: data.omId || user.omId,
         responsavelId: user.id,
         prioridade: data.prioridade || Prioridade.MEDIA,
         status: StatusPlano.RASCUNHO,

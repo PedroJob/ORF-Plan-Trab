@@ -1,4 +1,5 @@
 import { Role } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
 export function canCreateOperacao(role: Role): boolean {
   const allowedRoles: Role[] = [
@@ -153,4 +154,64 @@ export function canViewAllPlanosOfOperation(
   if (userRole === Role.SUPER_ADMIN || userOmId === operacaoOmId) return true;
 
   return false;
+}
+
+/**
+ * Verifica se usuário pode preencher plano de trabalho para uma operação.
+ * Regras:
+ * 1. A OM do usuário deve ser "folha" (não ter subordinadas)
+ * 2. A OM do usuário deve estar subordinada a uma OM participante da operação
+ */
+export async function canFillPlanoTrabalho(
+  userOmId: string,
+  operacaoId: string
+): Promise<{ allowed: boolean; reason?: string }> {
+  // 1. Verificar se OM do usuário é "folha" (sem filhas)
+  const userOm = await prisma.organizacaoMilitar.findUnique({
+    where: { id: userOmId },
+    include: {
+      omsFilhas: {
+        select: { id: true },
+        take: 1,
+      },
+    },
+  });
+
+  if (!userOm) {
+    return { allowed: false, reason: "OM do usuário não encontrada" };
+  }
+
+  // 2. Verificar se OM do usuário está subordinada a uma participante da operação
+  const operacao = await prisma.operacao.findUnique({
+    where: { id: operacaoId },
+    include: { omsParticipantes: true },
+  });
+
+  if (!operacao) {
+    return { allowed: false, reason: "Operação não encontrada" };
+  }
+
+  const omsParticipantesIds = operacao.omsParticipantes.map((p) => p.omId);
+
+  // Subir hierarquia até encontrar uma participante
+  let currentOmId: string | null = userOmId;
+
+  while (currentOmId) {
+    if (omsParticipantesIds.includes(currentOmId)) {
+      return { allowed: true };
+    }
+
+    const omAtual: { omPaiId: string | null } | null =
+      await prisma.organizacaoMilitar.findUnique({
+        where: { id: currentOmId },
+        select: { omPaiId: true },
+      });
+
+    currentOmId = omAtual?.omPaiId ?? null;
+  }
+
+  return {
+    allowed: false,
+    reason: "Sua OM não está subordinada a uma participante desta operação",
+  };
 }
