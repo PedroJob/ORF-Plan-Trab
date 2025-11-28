@@ -1,46 +1,76 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Plus, FileText, Calendar, User } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Plus, FileText, Calendar, User } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Prisma } from "@prisma/client";
+import { useSession } from "@/hooks/useSession";
 
-interface PlanoTrabalho {
-  id: string;
-  titulo: string;
-  versao: number;
-  status: string;
-  prioridade: string;
-  operacao: {
-    id: string;
-    nome: string;
+type PlanoTrabalho = Prisma.PlanoTrabalhoGetPayload<{
+  include: {
+    operacao: {
+      include: {
+        om: {
+          select: {
+            id: true;
+            nome: true;
+            sigla: true;
+            tipo: true;
+          };
+        };
+        omsParticipantes: {
+          include: {
+            om: {
+              select: {
+                id: true;
+                nome: true;
+                sigla: true;
+              };
+            };
+          };
+        };
+      };
+    };
     om: {
-      nome: string;
-      sigla: string;
+      select: {
+        id: true;
+        nome: true;
+        sigla: true;
+        tipo: true;
+      };
+    };
+    responsavel: {
+      select: {
+        id: true;
+        nomeCompleto: true;
+        nomeGuerra: true;
+        postoGraduacao: true;
+      };
+    };
+    despesas: {
+      select: {
+        id: true;
+        valorCalculado: true;
+      };
+    };
+    _count: {
+      select: {
+        despesas: true;
+        documentosReferencia: true;
+        anotacoes: true;
+      };
     };
   };
-  responsavel: {
-    id: string;
-    nomeCompleto: string;
-    nomeGuerra?: string;
-    postoGraduacao: string;
-  };
-  despesas: Array<{ id: string; valorCalculado: number }>;
-  _count: {
-    despesas: number;
-    documentos: number;
-    anotacoes: number;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
+}>;
 
 export default function PlanosPage() {
   const [planos, setPlanos] = useState<PlanoTrabalho[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const { user } = useSession();
 
   useEffect(() => {
     fetchPlanos();
@@ -48,12 +78,12 @@ export default function PlanosPage() {
 
   const fetchPlanos = async () => {
     try {
-      const response = await fetch('/api/planos');
+      const response = await fetch("/api/planos");
       const data = await response.json();
       // Garantir que sempre seja um array
       setPlanos(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error fetching planos:', error);
+      console.error("Error fetching planos:", error);
       setPlanos([]);
     } finally {
       setIsLoading(false);
@@ -62,37 +92,44 @@ export default function PlanosPage() {
 
   const getStatusColor = (status: string) => {
     const colors = {
-      RASCUNHO: 'bg-olive-100 text-olive-800',
-      EM_ANALISE: 'bg-amber-100 text-amber-800',
-      APROVADO: 'bg-military-200 text-military-900',
-      REPROVADO: 'bg-red-100 text-red-800',
+      RASCUNHO: "bg-olive-100 text-olive-800",
+      EM_ANALISE: "bg-amber-100 text-amber-800",
+      APROVADO: "bg-military-200 text-military-900",
+      REPROVADO: "bg-red-100 text-red-800",
     };
-    return colors[status as keyof typeof colors] || 'bg-olive-100 text-olive-800';
+    return (
+      colors[status as keyof typeof colors] || "bg-olive-100 text-olive-800"
+    );
   };
 
   const getPrioridadeColor = (prioridade: string) => {
     const colors = {
-      BAIXA: 'bg-military-100 text-military-700',
-      MEDIA: 'bg-amber-100 text-amber-700',
-      ALTA: 'bg-orange-100 text-orange-800',
-      CRITICA: 'bg-red-100 text-red-800',
+      BAIXA: "bg-military-100 text-military-700",
+      MEDIA: "bg-amber-100 text-amber-700",
+      ALTA: "bg-orange-100 text-orange-800",
+      CRITICA: "bg-red-100 text-red-800",
     };
-    return colors[prioridade as keyof typeof colors] || 'bg-olive-100 text-olive-800';
+    return (
+      colors[prioridade as keyof typeof colors] || "bg-olive-100 text-olive-800"
+    );
   };
 
   const calcularTotal = (despesas: Array<{ valorCalculado: number }>) => {
-    return despesas.reduce((sum, despesa) => sum + Number(despesa.valorCalculado), 0);
+    return despesas.reduce(
+      (sum, despesa) => sum + Number(despesa.valorCalculado),
+      0
+    );
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(value);
   };
 
   const filteredPlanos = statusFilter
-    ? planos.filter((p) => p.status === statusFilter)
+    ? planos.filter((p) => p.status === statusFilter && p.omId === user?.omId)
     : planos;
 
   if (isLoading) {
@@ -107,8 +144,12 @@ export default function PlanosPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-military-900 mb-2">Planos de Trabalho</h1>
-          <p className="text-olive-700">Gerenciar planos de trabalho logísticos</p>
+          <h1 className="text-3xl font-bold text-military-900 mb-2">
+            Planos de Trabalho
+          </h1>
+          <p className="text-olive-700">
+            Gerenciar planos de trabalho logísticos
+          </p>
         </div>
         <Link href="/dashboard/planos/novo">
           <Button>
@@ -121,54 +162,54 @@ export default function PlanosPage() {
       {/* Filtros */}
       <div className="mb-6 flex gap-2 flex-wrap">
         <button
-          onClick={() => setStatusFilter('')}
+          onClick={() => setStatusFilter("")}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            statusFilter === ''
-              ? 'bg-military-600 text-white'
-              : 'bg-white border border-olive-300 text-olive-800 hover:bg-olive-50'
+            statusFilter === ""
+              ? "bg-military-600 text-white"
+              : "bg-white border border-olive-300 text-olive-800 hover:bg-olive-50"
           }`}
         >
           Todos ({planos.length})
         </button>
         <button
-          onClick={() => setStatusFilter('RASCUNHO')}
+          onClick={() => setStatusFilter("RASCUNHO")}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            statusFilter === 'RASCUNHO'
-              ? 'bg-military-600 text-white'
-              : 'bg-white border border-olive-300 text-olive-800 hover:bg-olive-50'
+            statusFilter === "RASCUNHO"
+              ? "bg-military-600 text-white"
+              : "bg-white border border-olive-300 text-olive-800 hover:bg-olive-50"
           }`}
         >
-          Rascunho ({planos.filter((p) => p.status === 'RASCUNHO').length})
+          Rascunho ({planos.filter((p) => p.status === "RASCUNHO").length})
         </button>
         <button
-          onClick={() => setStatusFilter('EM_ANALISE')}
+          onClick={() => setStatusFilter("EM_ANALISE")}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            statusFilter === 'EM_ANALISE'
-              ? 'bg-military-600 text-white'
-              : 'bg-white border border-olive-300 text-olive-800 hover:bg-olive-50'
+            statusFilter === "EM_ANALISE"
+              ? "bg-military-600 text-white"
+              : "bg-white border border-olive-300 text-olive-800 hover:bg-olive-50"
           }`}
         >
-          Em Análise ({planos.filter((p) => p.status === 'EM_ANALISE').length})
+          Em Análise ({planos.filter((p) => p.status === "EM_ANALISE").length})
         </button>
         <button
-          onClick={() => setStatusFilter('APROVADO')}
+          onClick={() => setStatusFilter("APROVADO")}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            statusFilter === 'APROVADO'
-              ? 'bg-military-600 text-white'
-              : 'bg-white border border-olive-300 text-olive-800 hover:bg-olive-50'
+            statusFilter === "APROVADO"
+              ? "bg-military-600 text-white"
+              : "bg-white border border-olive-300 text-olive-800 hover:bg-olive-50"
           }`}
         >
-          Aprovado ({planos.filter((p) => p.status === 'APROVADO').length})
+          Aprovado ({planos.filter((p) => p.status === "APROVADO").length})
         </button>
         <button
-          onClick={() => setStatusFilter('REPROVADO')}
+          onClick={() => setStatusFilter("REPROVADO")}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            statusFilter === 'REPROVADO'
-              ? 'bg-military-600 text-white'
-              : 'bg-white border border-olive-300 text-olive-800 hover:bg-olive-50'
+            statusFilter === "REPROVADO"
+              ? "bg-military-600 text-white"
+              : "bg-white border border-olive-300 text-olive-800 hover:bg-olive-50"
           }`}
         >
-          Reprovado ({planos.filter((p) => p.status === 'REPROVADO').length})
+          Reprovado ({planos.filter((p) => p.status === "REPROVADO").length})
         </button>
       </div>
 
@@ -176,12 +217,14 @@ export default function PlanosPage() {
         <div className="bg-white rounded-lg border border-olive-200 p-12 text-center">
           <FileText className="w-16 h-16 text-olive-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-military-900 mb-2">
-            {statusFilter ? 'Nenhum plano encontrado' : 'Nenhum plano cadastrado'}
+            {statusFilter
+              ? "Nenhum plano encontrado"
+              : "Nenhum plano cadastrado"}
           </h3>
           <p className="text-olive-700 mb-6">
             {statusFilter
-              ? `Não há planos com status "${statusFilter.replace('_', ' ')}"`
-              : 'Comece criando um novo plano de trabalho'}
+              ? `Não há planos com status "${statusFilter.replace("_", " ")}"`
+              : "Comece criando um novo plano de trabalho"}
           </p>
           {!statusFilter && (
             <Link href="/dashboard/planos/novo">
@@ -206,12 +249,16 @@ export default function PlanosPage() {
                     <h3 className="text-xl font-semibold text-military-900">
                       {plano.titulo}
                     </h3>
-                    <span className="text-sm text-olive-600">v{plano.versao}</span>
+                    <span className="text-sm text-olive-600">
+                      v{plano.versao}
+                    </span>
                   </div>
                   <p className="text-olive-700 text-sm mb-2">
                     Operação: {plano.operacao.nome}
                   </p>
-                  <p className="text-olive-600 text-xs">{plano.operacao.om.sigla}</p>
+                  <p className="text-olive-600 text-xs">
+                    {plano.operacao.om.sigla}
+                  </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <span
@@ -219,7 +266,7 @@ export default function PlanosPage() {
                       plano.status
                     )}`}
                   >
-                    {plano.status.replace('_', ' ')}
+                    {plano.status.replace("_", " ")}
                   </span>
                   <span
                     className={`px-3 py-1 text-xs font-medium rounded-full ${getPrioridadeColor(
@@ -234,8 +281,9 @@ export default function PlanosPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="flex items-center text-sm text-olive-700">
                   <User className="w-4 h-4 mr-2" />
-                  {plano.responsavel.postoGraduacao}{' '}
-                  {plano.responsavel.nomeGuerra || plano.responsavel.nomeCompleto}
+                  {plano.responsavel.postoGraduacao}{" "}
+                  {plano.responsavel.nomeGuerra ||
+                    plano.responsavel.nomeCompleto}
                 </div>
                 <div className="flex items-center text-sm text-olive-700">
                   <FileText className="w-4 h-4 mr-2" />
@@ -251,10 +299,17 @@ export default function PlanosPage() {
 
               <div className="flex items-center justify-between pt-4 border-t border-olive-100">
                 <div className="text-sm text-olive-600">
-                  {plano._count.documentos} documento(s) • {plano._count.anotacoes} anotação(ões)
+                  {plano._count.documentosReferencia} documento(s) •{" "}
+                  {plano._count.anotacoes} anotação(ões)
                 </div>
                 <div className="text-lg font-bold text-military-700">
-                  {formatCurrency(calcularTotal(plano.despesas))}
+                  {formatCurrency(
+                    calcularTotal(
+                      plano.despesas.map((d) => ({
+                        valorCalculado: Number(d.valorCalculado),
+                      }))
+                    )
+                  )}
                 </div>
               </div>
             </Link>

@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { DespesaWithRelations } from "@/types/despesas";
-import { Prisma } from "@prisma/client";
+import { Prisma, User } from "@prisma/client";
 
 // Tipos
 type PlanoComRelacoes = Prisma.PlanoTrabalhoGetPayload<{
@@ -17,6 +17,13 @@ type PlanoComRelacoes = Prisma.PlanoTrabalhoGetPayload<{
         despesasNaturezas: { include: { natureza: true } };
       };
     };
+  };
+}>;
+
+type OperacaoComOM = Prisma.OperacaoGetPayload<{
+  include: {
+    om: true;
+    user: true;
   };
 }>;
 
@@ -176,9 +183,7 @@ function processarDespesas(despesas: DespesaWithRelations[]): DespesaParaPdf[] {
 
     // Dados da OM principal
     const omPrincipal = despesa.oms[0]?.om;
-    const omNome = omPrincipal
-      ? `${omPrincipal.nome}\n(${omPrincipal.sigla})`
-      : "";
+    const omNome = omPrincipal ? `${omPrincipal.sigla}` : "";
     const codUG = omPrincipal?.codUG || "";
 
     // Verificar se é despesa de combustível (Classe III)
@@ -261,12 +266,16 @@ function agruparDespesasPorOM(despesas: DespesaParaPdf[]): GrupoDespesas[] {
 export interface OpcoesPdf {
   acoesRealizadas?: string;
   despesasOperacionais?: string;
+  omPrincipal?: string;
 }
 
 export async function gerarPdfPlanoTrabalho(
-  plano: PlanoComRelacoes,
+  planos: PlanoComRelacoes | PlanoComRelacoes[],
+  operacao: OperacaoComOM,
+  responsavel?: User,
   opcoes?: OpcoesPdf
 ): Promise<void> {
+  planos = ([] as PlanoComRelacoes[]).concat(planos);
   const doc = new jsPDF({
     orientation: "landscape",
     unit: "mm",
@@ -307,13 +316,19 @@ export async function gerarPdfPlanoTrabalho(
   currentY += 5;
   doc.text("EXÉRCITO BRASILEIRO", pageWidth / 2, currentY, { align: "center" });
   currentY += 5;
-  doc.text(plano.om.nome.toUpperCase(), pageWidth / 2, currentY, {
+
+  const omPrincipal =
+    planos.length > 1
+      ? "COMANDO MILITAR DA AMAZONIA"
+      : opcoes?.omPrincipal ?? planos[0].om.nome.toUpperCase();
+
+  doc.text(omPrincipal, pageWidth / 2, currentY, {
     align: "center",
   });
   currentY += 6;
   doc.setFontSize(9);
   doc.text(
-    `PLANO DE TRABALHO LOGÍSTICO DE SOLICITAÇÃO DE RECURSOS ORÇAMENTÁRIOS E FINANCEIROS PARA ${plano.operacao.nome.toUpperCase()}`,
+    `PLANO DE TRABALHO LOGÍSTICO DE SOLICITAÇÃO DE RECURSOS ORÇAMENTÁRIOS E FINANCEIROS PARA ${operacao.nome.toUpperCase()}`,
     pageWidth / 2,
     currentY,
     { align: "center", maxWidth: pageWidth - 40 }
@@ -332,13 +347,13 @@ export async function gerarPdfPlanoTrabalho(
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
 
-  const dataInicio = new Date(plano.operacao.dataInicio);
-  const dataFinal = new Date(plano.operacao.dataFinal);
+  const dataInicio = new Date(operacao.dataInicio);
+  const dataFinal = new Date(operacao.dataFinal);
   const periodo = `${formatarDataCurta(dataInicio)} A ${formatarDataCurta(
     dataFinal
   )}`;
-  const efetivoMil = plano.operacao.efetivoMil;
-  const efetivoExt = plano.operacao.efetivoExt || 0;
+  const efetivoMil = operacao.efetivoMil;
+  const efetivoExt = operacao.efetivoExt || 0;
   const efetivo =
     efetivoExt > 0
       ? `${efetivoMil} militares do EB + ${efetivoExt} agentes externos`
@@ -347,7 +362,7 @@ export async function gerarPdfPlanoTrabalho(
   doc.text(`1. NOME DA OPERAÇÃO: `, marginLeft, currentY);
   doc.setFont("helvetica", "normal");
   doc.text(
-    plano.operacao.nome.toUpperCase(),
+    operacao.nome.toUpperCase(),
     marginLeft + doc.getTextWidth("1. NOME DA OPERAÇÃO: "),
     currentY
   );
@@ -374,9 +389,9 @@ export async function gerarPdfPlanoTrabalho(
   currentY += 5;
 
   // Usar valores das opções se fornecidos, senão usar valores da operação
-  const acoesRealizadas = opcoes?.acoesRealizadas || plano.operacao.finalidade;
+  const acoesRealizadas = opcoes?.acoesRealizadas || operacao.finalidade;
   const despesasOperacionais =
-    opcoes?.despesasOperacionais || plano.operacao.motivacao;
+    opcoes?.despesasOperacionais || operacao.motivacao;
 
   if (acoesRealizadas) {
     doc.setFont("helvetica", "bold");
@@ -420,131 +435,145 @@ export async function gerarPdfPlanoTrabalho(
 
   currentY += 5;
 
-  // === TABELA DE DESPESAS ===
-  const despesasProcessadas = processarDespesas(
-    plano.despesas as unknown as DespesaWithRelations[]
-  );
-  const grupos = agruparDespesasPorOM(despesasProcessadas);
-
-  let valorTotalGeral = 0;
-
-  grupos.forEach((grupo) => {
-    // Cabeçalho da tabela para cada grupo
-    const tableHead = [
-      [
-        "DESPESAS (ORDENAR POR CLASSE DE SUBSISTÊNCIA)",
-        "OM (UGE)\nCODUG",
-        "33.90.30",
-        "33.90.39",
-        "GND 3",
-        "LITROS",
-        "PREÇO\nUNITÁRIO",
-        "PREÇO\nTOTAL",
-        "DETALHAMENTO / MEMÓRIA DE CÁLCULO",
-      ],
-    ];
-
-    // Corpo da tabela
-    const tableBody: (string | number)[][] = [];
-
-    grupo.despesas.forEach((despesa) => {
-      tableBody.push([
-        despesa.descricao,
-        `${despesa.omNome}\n(${despesa.codUG})`,
-        formatarNumero(despesa.valor30),
-        formatarNumero(despesa.valor39),
-        formatarNumero(despesa.gnd3),
-        despesa.litros ? formatarNumero(despesa.litros) : "-",
-        despesa.precoUnitario
-          ? `R$ ${formatarNumero(despesa.precoUnitario)}`
-          : "-",
-        despesa.precoTotalCombustivel
-          ? `R$ ${formatarNumero(despesa.precoTotalCombustivel)}`
-          : "-",
-        despesa.memoriaCalculo,
-      ]);
-    });
-
-    // Linha de subtotal
-    tableBody.push([
-      "SOMA POR ND E GP DE DESPESA",
-      "",
-      formatarNumero(grupo.subtotal30),
-      formatarNumero(grupo.subtotal39),
-      formatarNumero(grupo.subtotalGnd3),
-      "",
-      "",
-      "",
-      "",
-    ]);
-
-    valorTotalGeral += grupo.subtotalGnd3;
-
-    autoTable(doc, {
-      head: tableHead,
-      body: tableBody,
-      startY: currentY,
-      theme: "grid",
-      styles: {
-        fontSize: 6,
-        cellPadding: 1,
-        overflow: "linebreak",
-        lineWidth: 0.1,
-      },
-      headStyles: {
-        fillColor: [255, 255, 255],
-        textColor: [0, 0, 0],
-        fontStyle: "bold",
-        halign: "center",
-        valign: "middle",
-        lineWidth: 0.2,
-      },
-      columnStyles: {
-        // Total: 28+18+15+15+15+14+16+16+140 = 277mm (A4 landscape - 20mm margins)
-        0: { cellWidth: 28, overflow: "linebreak" }, // DESPESAS
-        1: { cellWidth: 18, halign: "center", overflow: "linebreak" }, // OM (UGE) CODUG
-        2: { cellWidth: 15, halign: "right" }, // 33.90.30
-        3: { cellWidth: 15, halign: "right" }, // 33.90.39
-        4: { cellWidth: 15, halign: "right" }, // GND 3
-        5: { cellWidth: 14, halign: "right" }, // LITROS
-        6: { cellWidth: 16, halign: "right" }, // PREÇO UNIT
-        7: { cellWidth: 16, halign: "right" }, // PREÇO TOTAL
-        8: { cellWidth: 140, overflow: "linebreak" }, // DETALHAMENTO
-      },
-      didParseCell: function (data) {
-        // Estilizar linha de subtotal
-        if (
-          data.row.index === tableBody.length - 1 &&
-          data.section === "body"
-        ) {
-          data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fillColor = [240, 240, 240];
-        }
-      },
-      margin: { left: marginLeft, right: marginRight },
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    currentY = (doc as any).lastAutoTable.finalY + 5;
-
-    // Verificar se precisa de nova página
-    if (currentY > pageHeight - 40) {
-      doc.addPage();
-      currentY = marginTop;
+  for (const plano of planos) {
+    if (planos.length > 1) {
+      // Adicionar OM que preencheu o plano
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(
+        `OM RESPONSÁVEL: ${plano.om.nome.toUpperCase()}`,
+        marginLeft,
+        currentY
+      );
+      currentY += 8;
     }
-  });
 
-  // === VALOR TOTAL ===
-  currentY += 5;
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text(
-    `VALOR TOTAL: ${formatarMoeda(valorTotalGeral)}`,
-    pageWidth / 2,
-    currentY,
-    { align: "center" }
-  );
-  currentY += 15;
+    // === TABELA DE DESPESAS ===
+    const despesasProcessadas = processarDespesas(
+      plano.despesas as unknown as DespesaWithRelations[]
+    );
+    const grupos = agruparDespesasPorOM(despesasProcessadas);
+
+    let valorTotalGeral = 0;
+
+    grupos.forEach((grupo) => {
+      // Cabeçalho da tabela para cada grupo
+      const tableHead = [
+        [
+          "DESPESAS (ORDENAR POR CLASSE DE SUBSISTÊNCIA)",
+          "OM (UGE)\nCODUG",
+          "33.90.30",
+          "33.90.39",
+          "GND 3",
+          "LITROS",
+          "PREÇO\nUNITÁRIO",
+          "PREÇO\nTOTAL",
+          "DETALHAMENTO / MEMÓRIA DE CÁLCULO",
+        ],
+      ];
+
+      // Corpo da tabela
+      const tableBody: (string | number)[][] = [];
+
+      grupo.despesas.forEach((despesa) => {
+        tableBody.push([
+          despesa.descricao,
+          `${despesa.omNome}\n(${despesa.codUG})`,
+          formatarNumero(despesa.valor30),
+          formatarNumero(despesa.valor39),
+          formatarNumero(despesa.gnd3),
+          despesa.litros ? formatarNumero(despesa.litros) : "-",
+          despesa.precoUnitario
+            ? `R$ ${formatarNumero(despesa.precoUnitario)}`
+            : "-",
+          despesa.precoTotalCombustivel
+            ? `R$ ${formatarNumero(despesa.precoTotalCombustivel)}`
+            : "-",
+          despesa.memoriaCalculo,
+        ]);
+      });
+
+      // Linha de subtotal
+      tableBody.push([
+        "SOMA POR ND E GP DE DESPESA",
+        "",
+        formatarNumero(grupo.subtotal30),
+        formatarNumero(grupo.subtotal39),
+        formatarNumero(grupo.subtotalGnd3),
+        "",
+        "",
+        "",
+        "",
+      ]);
+
+      valorTotalGeral += grupo.subtotalGnd3;
+
+      autoTable(doc, {
+        head: tableHead,
+        body: tableBody,
+        startY: currentY,
+        theme: "grid",
+        styles: {
+          fontSize: 6,
+          cellPadding: 1,
+          overflow: "linebreak",
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [255, 255, 255],
+          textColor: [0, 0, 0],
+          fontStyle: "bold",
+          halign: "center",
+          valign: "middle",
+          lineWidth: 0.2,
+        },
+        columnStyles: {
+          // Total: 28+18+15+15+15+14+16+16+140 = 277mm (A4 landscape - 20mm margins)
+          0: { cellWidth: 28, overflow: "linebreak" }, // DESPESAS
+          1: { cellWidth: 18, halign: "center", overflow: "linebreak" }, // OM (UGE) CODUG
+          2: { cellWidth: 15, halign: "right" }, // 33.90.30
+          3: { cellWidth: 15, halign: "right" }, // 33.90.39
+          4: { cellWidth: 15, halign: "right" }, // GND 3
+          5: { cellWidth: 14, halign: "right" }, // LITROS
+          6: { cellWidth: 16, halign: "right" }, // PREÇO UNIT
+          7: { cellWidth: 16, halign: "right" }, // PREÇO TOTAL
+          8: { cellWidth: 140, overflow: "linebreak" }, // DETALHAMENTO
+        },
+        didParseCell: function (data) {
+          // Estilizar linha de subtotal
+          if (
+            data.row.index === tableBody.length - 1 &&
+            data.section === "body"
+          ) {
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fillColor = [240, 240, 240];
+          }
+        },
+        margin: { left: marginLeft, right: marginRight },
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      currentY = (doc as any).lastAutoTable.finalY + 5;
+
+      // Verificar se precisa de nova página
+      if (currentY > pageHeight - 40) {
+        doc.addPage();
+        currentY = marginTop;
+      }
+    });
+
+    // === VALOR TOTAL ===
+    currentY += 5;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `VALOR TOTAL: ${formatarMoeda(valorTotalGeral)}`,
+      pageWidth / 2,
+      currentY,
+      { align: "center" }
+    );
+    currentY += 15;
+  }
 
   // === RODAPÉ - ASSINATURA ===
   const hoje = new Date();
@@ -562,21 +591,21 @@ export async function gerarPdfPlanoTrabalho(
   currentY += 15;
 
   // Nome e cargo do responsável
-  doc.setFont("helvetica", "bold");
-  doc.text(
-    `${
-      plano.responsavel.postoGraduacao
-    } ${plano.responsavel.nomeCompleto.toUpperCase()}`,
-    pageWidth / 2,
-    currentY,
-    { align: "center" }
-  );
-  currentY += 5;
-  doc.setFont("helvetica", "normal");
-  doc.text(`Responsável pelo Plano de Trabalho`, pageWidth / 2, currentY, {
-    align: "center",
-  });
+  if (responsavel) {
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `${responsavel.postoGraduacao} ${responsavel.nomeCompleto.toUpperCase()}`,
+      pageWidth / 2,
+      currentY,
+      { align: "center" }
+    );
+    currentY += 5;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Responsável pelo Plano de Trabalho`, pageWidth / 2, currentY, {
+      align: "center",
+    });
+  }
 
   // Salvar o PDF
-  doc.save(`plano_trabalho_${plano.operacao.nome.replace(/\s+/g, "_")}.pdf`);
+  doc.save(`plano_trabalho_${operacao.nome.replace(/\s+/g, "_")}.pdf`);
 }

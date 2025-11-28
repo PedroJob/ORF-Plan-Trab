@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
 interface Operacao {
   id: string;
@@ -21,15 +21,17 @@ export default function NovoPlanoPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [operacoes, setOperacoes] = useState<Operacao[]>([]);
   const [loadingOperacoes, setLoadingOperacoes] = useState(true);
 
   const [formData, setFormData] = useState({
-    titulo: 'P Trab LOG CMA',
-    operacaoId: searchParams.get('operacaoId') || '',
-    prioridade: 'MEDIA',
-    tipo: 'LOGISTICO',
+    titulo: "P Trab LOG CMA",
+    operacaoId: searchParams.get("operacaoId") || "",
+    prioridade: "MEDIA",
+    tipo: "LOGISTICO",
+    acoes: "",
+    despesasOperacionais: "",
   });
 
   useEffect(() => {
@@ -38,11 +40,11 @@ export default function NovoPlanoPage() {
 
   const fetchOperacoes = async () => {
     try {
-      const response = await fetch('/api/operacoes');
+      const response = await fetch("/api/operacoes");
       const data = await response.json();
       setOperacoes(data);
     } catch (error) {
-      console.error('Error fetching operacoes:', error);
+      console.error("Error fetching operacoes:", error);
     } finally {
       setLoadingOperacoes(false);
     }
@@ -50,25 +52,25 @@ export default function NovoPlanoPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/planos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/planos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao criar plano');
+        throw new Error(data.error || "Erro ao criar plano");
       }
 
       router.push(`/dashboard/planos/${data.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar plano');
+      setError(err instanceof Error ? err.message : "Erro ao criar plano");
     } finally {
       setIsLoading(false);
     }
@@ -84,27 +86,39 @@ export default function NovoPlanoPage() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar para Planos
         </Link>
-        <h1 className="text-3xl font-bold text-military-900">Novo Plano de Trabalho</h1>
+        <h1 className="text-3xl font-bold text-military-900">
+          Novo Plano de Trabalho
+        </h1>
       </div>
 
       <div className="bg-white rounded-lg border border-olive-200 p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
+            <div>
               <label className="block text-sm font-medium text-olive-800 mb-1">
                 Tipo de Plano <span className="text-red-600">*</span>
               </label>
               <select
                 value={formData.tipo}
-                onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, tipo: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 bg-white"
                 required
               >
                 <option value="LOGISTICO">Logístico</option>
-                <option value="OPERACIONAL_GND3" disabled>Operacional GND3 (Em desenvolvimento)</option>
-                <option value="OPERACIONAL_GND4" disabled>Operacional GND4 (Em desenvolvimento)</option>
-                <option value="RACAO_R2" disabled>Ração R2 (Em desenvolvimento)</option>
-                <option value="MUNICAO" disabled>Munição (Em desenvolvimento)</option>
+                <option value="OPERACIONAL_GND3" disabled>
+                  Operacional GND3 (Em desenvolvimento)
+                </option>
+                <option value="OPERACIONAL_GND4" disabled>
+                  Operacional GND4 (Em desenvolvimento)
+                </option>
+                <option value="RACAO_R2" disabled>
+                  Ração R2 (Em desenvolvimento)
+                </option>
+                <option value="MUNICAO" disabled>
+                  Munição (Em desenvolvimento)
+                </option>
               </select>
             </div>
 
@@ -114,7 +128,9 @@ export default function NovoPlanoPage() {
               </label>
               <select
                 value={formData.prioridade}
-                onChange={(e) => setFormData({ ...formData, prioridade: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, prioridade: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 bg-white"
                 required
               >
@@ -129,7 +145,9 @@ export default function NovoPlanoPage() {
               <Input
                 label="Título do Plano"
                 value={formData.titulo}
-                onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, titulo: e.target.value })
+                }
                 placeholder="Ex: Plano Logístico Operação CATRIMANI II"
                 required
               />
@@ -157,7 +175,9 @@ export default function NovoPlanoPage() {
               ) : (
                 <select
                   value={formData.operacaoId}
-                  onChange={(e) => setFormData({ ...formData, operacaoId: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, operacaoId: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-military-500 bg-white"
                   required
                 >
@@ -171,7 +191,6 @@ export default function NovoPlanoPage() {
               )}
             </div>
           </div>
-
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-600">{error}</p>
@@ -179,7 +198,11 @@ export default function NovoPlanoPage() {
           )}
 
           <div className="flex gap-4">
-            <Button type="submit" isLoading={isLoading} disabled={operacoes.length === 0}>
+            <Button
+              type="submit"
+              isLoading={isLoading}
+              disabled={operacoes.length === 0}
+            >
               Criar Plano de Trabalho
             </Button>
             <Link href="/dashboard/planos">

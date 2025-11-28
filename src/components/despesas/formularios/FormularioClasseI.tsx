@@ -9,7 +9,12 @@ import {
 import { VALORES_REFEICAO, MAX_DIAS_ETAPA } from "@/lib/constants";
 import { Tipo } from "@prisma/client";
 import { HandleParametrosChange as HandleParametrosChange } from "../ModalCriarDespesa";
-import type { OperacaoWithEfetivo, UserOM, NaturezaSelect, RateioNatureza } from "@/types/despesas";
+import type {
+  OperacaoWithEfetivo,
+  UserOM,
+  NaturezaSelect,
+  RateioNatureza,
+} from "@/types/despesas";
 
 export type TipoRefeicao = "QR" | "QS";
 
@@ -36,7 +41,6 @@ export function FormularioClasseI({
   tipo,
   onChange,
   operacao,
-  userOm,
   planoOm,
   naturezas,
   rateioNaturezas,
@@ -66,7 +70,9 @@ export function FormularioClasseI({
   // Mapear naturezas selecionadas para códigos
   const getNaturezasCodigos = useCallback(() => {
     return rateioNaturezas
-      .map(rateio => naturezas.find(n => n.id === rateio.naturezaId)?.codigo)
+      .map(
+        (rateio) => naturezas.find((n) => n.id === rateio.naturezaId)?.codigo
+      )
       .filter((codigo): codigo is string => codigo !== undefined);
   }, [rateioNaturezas, naturezas]);
 

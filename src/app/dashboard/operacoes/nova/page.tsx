@@ -41,7 +41,9 @@ export default function NovaOperacaoPage() {
     valorLimiteTotal: "",
   });
 
-  const [omsParticipantes, setOmsParticipantes] = useState<OMParticipante[]>([]);
+  const [omsParticipantes, setOmsParticipantes] = useState<OMParticipante[]>(
+    []
+  );
 
   // Carregar OMs disponíveis
   useEffect(() => {
@@ -68,7 +70,8 @@ export default function NovaOperacaoPage() {
   );
 
   const valorLimiteTotal = parseFloat(formData.valorLimiteTotal) || 0;
-  const excedeLimite = valorLimiteTotal > 0 && somaValoresOms > valorLimiteTotal;
+  const excedeLimite =
+    valorLimiteTotal > 0 && somaValoresOms > valorLimiteTotal;
   const valorRestante = valorLimiteTotal - somaValoresOms;
 
   const handleAddOm = () => {
@@ -273,6 +276,41 @@ export default function NovaOperacaoPage() {
             />
           </div>
 
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ações realizadas ou a realizar
+              </label>
+              <textarea
+                value={formData.finalidade || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, finalidade: e.target.value })
+                }
+                rows={4}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: Ações referentes à montagem, aperfeiçoamento e operação das Bases..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Despesas operacionais realizadas ou a realizar
+              </label>
+              <textarea
+                value={formData.motivacao || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    motivacao: e.target.value,
+                  })
+                }
+                rows={4}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: Aquisição de Material e contratação de serviços necessários..."
+              />
+            </div>
+          </div>
+
           {/* OMs Participantes */}
           <div className="border-t pt-6">
             <div className="flex items-center justify-between mb-4">
@@ -352,7 +390,11 @@ export default function NovaOperacaoPage() {
 
                 {/* Resumo dos valores */}
                 <div
-                  className={`p-4 rounded-lg ${excedeLimite ? "bg-red-50 border border-red-200" : "bg-blue-50 border border-blue-200"}`}
+                  className={`p-4 rounded-lg ${
+                    excedeLimite
+                      ? "bg-red-50 border border-red-200"
+                      : "bg-blue-50 border border-blue-200"
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -360,7 +402,9 @@ export default function NovaOperacaoPage() {
                         Soma dos valores alocados:
                       </p>
                       <p
-                        className={`text-lg font-bold ${excedeLimite ? "text-red-600" : "text-blue-600"}`}
+                        className={`text-lg font-bold ${
+                          excedeLimite ? "text-red-600" : "text-blue-600"
+                        }`}
                       >
                         {formatCurrency(somaValoresOms)}
                       </p>
@@ -371,7 +415,9 @@ export default function NovaOperacaoPage() {
                           {excedeLimite ? "Excedente:" : "Disponível:"}
                         </p>
                         <p
-                          className={`text-lg font-bold ${excedeLimite ? "text-red-600" : "text-green-600"}`}
+                          className={`text-lg font-bold ${
+                            excedeLimite ? "text-red-600" : "text-green-600"
+                          }`}
                         >
                           {formatCurrency(Math.abs(valorRestante))}
                         </p>
@@ -394,8 +440,8 @@ export default function NovaOperacaoPage() {
                   Nenhuma OM participante adicionada
                 </p>
                 <p className="text-sm text-gray-400 mt-1">
-                  Clique em &quot;Adicionar OM&quot; para definir as organizações
-                  participantes
+                  Clique em &quot;Adicionar OM&quot; para definir as
+                  organizações participantes
                 </p>
               </div>
             )}

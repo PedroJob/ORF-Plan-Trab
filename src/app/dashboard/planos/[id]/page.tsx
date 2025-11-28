@@ -12,7 +12,10 @@ import { HistoricoAprovacoes } from "@/components/planos/HistoricoAprovacoes";
 import { DespesaWithRelations, UserOM } from "@/types/despesas";
 import { PlanoTrabalho, Prisma } from "@prisma/client";
 import { PlanoTrabalhoWithRelations } from "@/types/plano-trabalho";
-import { gerarPdfPlanoTrabalho, OpcoesPdf } from "@/lib/pdf/gerarPdfPlanoTrabalho";
+import {
+  gerarPdfPlanoTrabalho,
+  OpcoesPdf,
+} from "@/lib/pdf/gerarPdfPlanoTrabalho";
 
 interface OM {
   id: string;
@@ -196,7 +199,12 @@ export default function PlanoTrabalhoPage() {
   };
 
   const handleEnviarAnalise = async () => {
-    if (!confirm("Deseja enviar este plano para análise? Após o envio, o plano ficará bloqueado para edições até a conclusão do processo de aprovação.")) return;
+    if (
+      !confirm(
+        "Deseja enviar este plano para análise? Após o envio, o plano ficará bloqueado para edições até a conclusão do processo de aprovação."
+      )
+    )
+      return;
 
     try {
       const response = await fetch(`/api/planos/${id}/enviar-analise`, {
@@ -293,7 +301,12 @@ export default function PlanoTrabalhoPage() {
         throw new Error("Erro ao carregar dados do plano");
       }
       const planoCompleto = await response.json();
-      await gerarPdfPlanoTrabalho(planoCompleto, pdfOpcoes);
+      await gerarPdfPlanoTrabalho(
+        planoCompleto,
+        planoCompleto.operacao,
+        planoCompleto.responsavel,
+        pdfOpcoes
+      );
       setShowPdfModal(false);
     } catch (error) {
       console.error("Erro ao gerar PDF:", error);
@@ -333,7 +346,7 @@ export default function PlanoTrabalhoPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleAbrirModalPdf}>
+            <Button variant="secondary" onClick={handleGerarPdf}>
               <FileDown className="w-4 h-4 mr-2" />
               Exportar PDF
             </Button>
@@ -364,8 +377,16 @@ export default function PlanoTrabalhoPage() {
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
           <div className="flex items-start">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              <svg
+                className="h-5 w-5 text-amber-600"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
               </svg>
             </div>
             <div className="ml-3 flex-1">
@@ -378,7 +399,8 @@ export default function PlanoTrabalhoPage() {
                   {plano.nivelAprovacaoAtual && (
                     <>
                       <span className="font-semibold">
-                        Aguardando aprovação do nível {plano.nivelAprovacaoAtual}/3:{" "}
+                        Aguardando aprovação do nível{" "}
+                        {plano.nivelAprovacaoAtual}/3:{" "}
                         {
                           {
                             1: "Comandante da OM",
@@ -433,7 +455,15 @@ export default function PlanoTrabalhoPage() {
             canEdit={plano.status === "RASCUNHO"}
             onRefresh={fetchData}
             userOm={userOm}
-            planoOm={plano.om ? { id: plano.om.id, nome: plano.om.nome, sigla: plano.om.sigla } : null}
+            planoOm={
+              plano.om
+                ? {
+                    id: plano.om.id,
+                    nome: plano.om.nome,
+                    sigla: plano.om.sigla,
+                  }
+                : null
+            }
           />
         ) : (
           <>
@@ -650,90 +680,6 @@ export default function PlanoTrabalhoPage() {
             status={plano.status}
           />
           <HistoricoAprovacoes planoId={id} />
-        </div>
-      )}
-
-      {/* Modal de Exportação PDF */}
-      {showPdfModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Exportar Plano de Trabalho
-                </h2>
-                <button
-                  onClick={() => setShowPdfModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              <p className="text-sm text-gray-600 mb-6">
-                Preencha as informações que serão incluídas no cabeçalho do PDF:
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    4. AÇÕES REALIZADAS OU A REALIZAR:
-                  </label>
-                  <textarea
-                    value={pdfOpcoes.acoesRealizadas || ""}
-                    onChange={(e) =>
-                      setPdfOpcoes({ ...pdfOpcoes, acoesRealizadas: e.target.value })
-                    }
-                    rows={4}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ex: Ações referentes à montagem, aperfeiçoamento e operação das Bases..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    5. DESPESAS OPERACIONAIS REALIZADAS OU A REALIZAR:
-                  </label>
-                  <textarea
-                    value={pdfOpcoes.despesasOperacionais || ""}
-                    onChange={(e) =>
-                      setPdfOpcoes({ ...pdfOpcoes, despesasOperacionais: e.target.value })
-                    }
-                    rows={4}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ex: Aquisição de Material e contratação de serviços necessários..."
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowPdfModal(false)}
-                  disabled={isGeneratingPdf}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleGerarPdf}
-                  disabled={isGeneratingPdf}
-                >
-                  {isGeneratingPdf ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Gerando...
-                    </>
-                  ) : (
-                    <>
-                      <FileDown className="w-4 h-4 mr-2" />
-                      Gerar PDF
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>

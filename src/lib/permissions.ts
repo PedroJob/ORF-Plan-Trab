@@ -28,7 +28,7 @@ export function canApprove(role: Role): boolean {
 
 export function canViewAllPlanos(role: Role): boolean {
   // COMANDANTE e SUPER_ADMIN podem ver todos os planos
-  const allowedRoles: Role[] = [Role.COMANDANTE, Role.SUPER_ADMIN];
+  const allowedRoles: Role[] = [Role.SUPER_ADMIN];
   return allowedRoles.includes(role);
 }
 
@@ -150,12 +150,7 @@ export function canViewAllPlanosOfOperation(
   operacaoOmId: string
 ): boolean {
   // SUPER_ADMIN vê todos
-  if (userRole === Role.SUPER_ADMIN) return true;
-
-  // S4 e COMANDANTE da OM criadora veem todos
-  if (userOmId === operacaoOmId) {
-    return userRole === Role.S4 || userRole === Role.COMANDANTE;
-  }
+  if (userRole === Role.SUPER_ADMIN || userOmId === operacaoOmId) return true;
 
   return false;
 }

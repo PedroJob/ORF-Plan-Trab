@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { useSession } from "@/hooks/useSession";
 
 interface OMParticipante {
   id: string;
@@ -77,6 +78,7 @@ interface Operacao {
 export default function OperacaoDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useSession();
   const id = params?.id as string;
 
   const [operacao, setOperacao] = useState<Operacao | null>(null);
@@ -110,7 +112,9 @@ export default function OperacaoDetailPage() {
       APROVADO: "bg-military-200 text-military-900",
       REPROVADO: "bg-red-100 text-red-800",
     };
-    return colors[status as keyof typeof colors] || "bg-olive-100 text-olive-800";
+    return (
+      colors[status as keyof typeof colors] || "bg-olive-100 text-olive-800"
+    );
   };
 
   const getPrioridadeColor = (prioridade: string) => {
@@ -298,7 +302,10 @@ export default function OperacaoDetailPage() {
           {operacao.valorLimiteTotal && (
             <div className="text-xs text-olive-600 mt-1">
               Utilizado: {formatCurrency(valorTotalUtilizado)} (
-              {((valorTotalUtilizado / Number(operacao.valorLimiteTotal)) * 100).toFixed(1)}
+              {(
+                (valorTotalUtilizado / Number(operacao.valorLimiteTotal)) *
+                100
+              ).toFixed(1)}
               %)
             </div>
           )}
@@ -326,6 +333,7 @@ export default function OperacaoDetailPage() {
           </h2>
           <div className="space-y-3">
             {operacao.omsParticipantes.map((omPart) => {
+              const canCreatePlano = omPart.omId === user?.om.id;
               const plano = getPlanoByOm(omPart.omId);
               const valorUtilizado = plano
                 ? Number(plano.valorTotalDespesas) || 0
@@ -363,9 +371,14 @@ export default function OperacaoDetailPage() {
                     <div className="text-right">
                       <div className="text-sm text-olive-600">Utilizado</div>
                       <div
-                        className={`font-semibold ${percentual > 100 ? "text-red-600" : "text-military-900"}`}
+                        className={`font-semibold ${
+                          percentual > 100
+                            ? "text-red-600"
+                            : "text-military-900"
+                        }`}
                       >
-                        {formatCurrency(valorUtilizado)} ({percentual.toFixed(1)}%)
+                        {formatCurrency(valorUtilizado)} (
+                        {percentual.toFixed(1)}%)
                       </div>
                     </div>
 
@@ -373,7 +386,9 @@ export default function OperacaoDetailPage() {
                       {plano ? (
                         <Link href={`/dashboard/planos/${plano.id}`}>
                           <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg ${getStatusColor(plano.status)}`}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg ${getStatusColor(
+                              plano.status
+                            )}`}
                           >
                             {plano.status === "APROVADO" ? (
                               <CheckCircle2 className="w-4 h-4" />
@@ -385,7 +400,7 @@ export default function OperacaoDetailPage() {
                             </span>
                           </div>
                         </Link>
-                      ) : (
+                      ) : canCreatePlano ? (
                         <Link
                           href={`/dashboard/planos/novo?operacaoId=${operacao.id}`}
                         >
@@ -396,7 +411,7 @@ export default function OperacaoDetailPage() {
                             </span>
                           </div>
                         </Link>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -463,76 +478,6 @@ export default function OperacaoDetailPage() {
           </div>
         </div>
       )}
-
-      {/* Planos de Trabalho */}
-      <div className="bg-white rounded-lg border border-olive-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-military-900">
-            Planos de Trabalho
-          </h2>
-          <Link href={`/dashboard/planos/novo?operacaoId=${operacao.id}`}>
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Plano
-            </Button>
-          </Link>
-        </div>
-
-        {operacao.planosTrabalho.length === 0 ? (
-          <div className="text-center py-12">
-            <FileText className="w-12 h-12 text-olive-400 mx-auto mb-4" />
-            <p className="text-olive-700 mb-4">
-              Nenhum plano de trabalho cadastrado
-            </p>
-            <Link href={`/dashboard/planos/novo?operacaoId=${operacao.id}`}>
-              <Button variant="secondary" size="sm">
-                <Plus className="w-4 h-4 mr-2" />
-                Criar Primeiro Plano
-              </Button>
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {operacao.planosTrabalho.map((plano) => (
-              <Link
-                key={plano.id}
-                href={`/dashboard/planos/${plano.id}`}
-                className="flex items-center justify-between p-4 border border-olive-200 rounded-lg hover:bg-military-50 hover:border-military-400 transition-all"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg font-medium text-military-900">
-                      {plano.titulo}
-                    </h3>
-                    <span className="text-xs text-olive-600">v{plano.versao}</span>
-                    {plano.om && (
-                      <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
-                        {plano.om.sigla}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-olive-700">
-                    {plano.responsavel.postoGraduacao}{" "}
-                    {plano.responsavel.nomeGuerra || plano.responsavel.nomeCompleto}
-                    {plano.valorTotalDespesas && (
-                      <span className="ml-2">
-                        • {formatCurrency(Number(plano.valorTotalDespesas))}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <span
-                  className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                    plano.status
-                  )}`}
-                >
-                  {plano.status.replace("_", " ")}
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

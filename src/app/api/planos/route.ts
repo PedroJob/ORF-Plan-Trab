@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/auth';
-import { canCreatePlanoTrabalho } from '@/lib/permissions';
-import { z } from 'zod';
-import { StatusPlano, Prioridade, TipoEvento } from '@prisma/client';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
+import { canCreatePlanoTrabalho } from "@/lib/permissions";
+import { z } from "zod";
+import { StatusPlano, Prioridade, TipoEvento } from "@prisma/client";
 
 const createPlanoSchema = z.object({
-  operacaoId: z.string().cuid('ID de operação inválido'),
-  titulo: z.string().min(1, 'Título é obrigatório'),
+  operacaoId: z.string().cuid("ID de operação inválido"),
+  titulo: z.string().min(1, "Título é obrigatório"),
   prioridade: z.nativeEnum(Prioridade).optional(),
 });
 
@@ -15,11 +15,11 @@ export async function GET(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const operacaoId = searchParams.get('operacaoId');
+    const operacaoId = searchParams.get("operacaoId");
 
     const user = await prisma.user.findUnique({
       where: { id: currentUser.userId },
@@ -27,7 +27,10 @@ export async function GET(request: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Usuário não encontrado" },
+        { status: 404 }
+      );
     }
 
     const whereClause: any = {};
@@ -37,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Filtrar por OM se não for role que vê tudo (COMANDANTE e SUPER_ADMIN veem todos)
-    if (!['COMANDANTE', 'SUPER_ADMIN'].includes(user.role)) {
+    if (!["SUPER_ADMIN"].includes(user.role)) {
       // Usuário vê planos da sua OM ou de operações criadas pela sua OM
       whereClause.OR = [
         { omId: user.omId }, // Planos da OM do usuário
@@ -101,14 +104,14 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json(planos);
   } catch (error) {
-    console.error('Get planos error:', error);
+    console.error("Get planos error:", error);
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }
@@ -118,7 +121,7 @@ export async function POST(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
@@ -127,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     if (!user || !canCreatePlanoTrabalho(user.role)) {
       return NextResponse.json(
-        { error: 'Sem permissão para criar plano de trabalho' },
+        { error: "Sem permissão para criar plano de trabalho" },
         { status: 403 }
       );
     }
@@ -137,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Dados inválidos', details: validation.error.errors },
+        { error: "Dados inválidos", details: validation.error.errors },
         { status: 400 }
       );
     }
@@ -154,20 +157,20 @@ export async function POST(request: NextRequest) {
 
     if (!operacao) {
       return NextResponse.json(
-        { error: 'Operação não encontrada' },
+        { error: "Operação não encontrada" },
         { status: 404 }
       );
     }
 
     // Verificar se a OM do usuário participa da operação (se não for SUPER_ADMIN)
-    if (user.role !== 'SUPER_ADMIN') {
+    if (user.role !== "SUPER_ADMIN") {
       const omParticipates = operacao.omsParticipantes.some(
         (p) => p.omId === user.omId
       );
 
       if (!omParticipates) {
         return NextResponse.json(
-          { error: 'Sua OM não participa desta operação' },
+          { error: "Sua OM não participa desta operação" },
           { status: 403 }
         );
       }
@@ -185,7 +188,9 @@ export async function POST(request: NextRequest) {
 
     if (existingPlano) {
       return NextResponse.json(
-        { error: 'Já existe um plano de trabalho da sua OM para esta operação' },
+        {
+          error: "Já existe um plano de trabalho da sua OM para esta operação",
+        },
         { status: 400 }
       );
     }
@@ -193,7 +198,7 @@ export async function POST(request: NextRequest) {
     // Obter próxima versão (global para a operação, para histórico)
     const lastVersion = await prisma.planoTrabalho.findFirst({
       where: { operacaoId: data.operacaoId },
-      orderBy: { versao: 'desc' },
+      orderBy: { versao: "desc" },
       select: { versao: true },
     });
 
@@ -252,9 +257,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(plano, { status: 201 });
   } catch (error) {
-    console.error('Create plano error:', error);
+    console.error("Create plano error:", error);
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { error: "Erro interno do servidor" },
       { status: 500 }
     );
   }

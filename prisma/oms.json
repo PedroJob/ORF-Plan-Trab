@@ -1,0 +1,129 @@
+{
+    "comando": {
+        "nome": "COMANDO MILITAR DA AMAZÔNIA",
+        "ramos": [
+            {
+                "tipo": "Região Militar",
+                "nome": "12ª RM",
+                "sede": "Manaus-AM",
+                "unidades": [
+                    "Cia C 12ª RM",
+                    "12ª B Sup",
+                    "Pq R Mnt/12",
+                    "CFR",
+                    "CECMa",
+                    "HMAM",
+                    "H Gu",
+                    "H Gu",
+                    "H Gu SG"
+                ]
+            },
+            {
+                "tipo": "Brigada",
+                "sigla": "1ª Bda Inf Sl",
+                "unidades": [
+                    "Cia C 1ª Bda Inf Sl",
+                    "1º BIS (Amv)",
+                    "CFRR/7º BIS",
+                    "10º GAC Sl",
+                    "1ª B Log Sl",
+                    "18º R C Mec",
+                    "1º Pel Com Sl",
+                    "32º Pel PE"
+                ]
+            },
+            {
+                "tipo": "Brigada",
+                "nome": "2ª Bda Inf Sl",
+                "sede": "Cachoeira-AM",
+                "unidades": [
+                    "Cia C 2ª Bda Inf Sl S G C",
+                    "3º BIS",
+                    "CFRN/5º BIS S G C",
+                    "2º B Log Sl S G C",
+                    "2º Pel Com Sl S G C",
+                    "22º Pel PE Sl S G C"
+                ]
+            },
+            {
+                "tipo": "Brigada",
+                "nome": "16ª Bda Inf Sl",
+                "sede": "Tefé-AM",
+                "unidades": [
+                    "Cia C 16ª Bda Inf Sl",
+                    "CFSOL/8º BIS",
+                    "CF Japurá/17º BIS",
+                    "16ª Ba Log Sl",
+                    "16ª Pel Com Sl",
+                    "34º Pel PE"
+                ]
+            },
+            {
+                "tipo": "Brigada",
+                "nome": "17ª Bda Inf Sl",
+                "sede": "Porto Velho-RO",
+                "unidades": [
+                    "Cia C 17ª Bda Inf Sl",
+                    "CFAC/4º BIS",
+                    "CFRo/6º BIS",
+                    "54º BIS",
+                    "CF Juruá/61º BIS",
+                    "17ª Cia Inf Sl",
+                    "17ª Ba Log Sl",
+                    "17º Pel Com Sl",
+                    "17º Pel PE"
+                ]
+            },
+            {
+                "tipo": "Grupamento",
+                "nome": "2º Gpt E",
+                "sede": "Manaus-AM",
+                "unidades": [
+                    "Cia C 2º Gpt E",
+                    "21ª Cia E Cnstr S G C",
+                    "5º BEC",
+                    "6º BEC",
+                    "7º BEC",
+                    "8º BEC",
+                    "CRO/12"
+                ]
+            },
+            {
+                "nome": "Cia C CMA"
+            },
+            {
+                "nome": "CIGS"
+            },
+            {
+                "nome": "4º BAvEx"
+            },
+            {
+                "nome": "7º BPE"
+            },
+            {
+                "nome": "1º B Com GE Sl"
+            },
+            {
+                "nome": "Nu 4º BIM"
+            },
+            {
+                "nome": "3º Cia FEsp"
+            },
+            {
+                "nome": "12ª GAAAE Sl"
+            },
+            {
+                "nome": "CMM"
+            },
+            {
+                "nome": "4º CGEO"
+            },
+            {
+                "nome": "4º CTA"
+            },
+            {
+                "nome": "12º CGCFEx"
+            }
+        ]
+    }
+}

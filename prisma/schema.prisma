@@ -59,6 +59,7 @@ enum TipoOM {
   COMPANHIA
   BATALHAO
   BRIGADA
+  GRUPAMENTO
   CMA
   COTER
 }
@@ -89,18 +90,18 @@ model Anotacao {
 }
 
 model AprovacaoHistorico {
-  id               String              @id @default(cuid())
+  id               String             @id @default(cuid())
   acao             AcaoAprovacao
   motivo           String?
-  nivelHierarquico Int                 @map("nivel_hierarquico")
-  planoTrabalhoId  String              @map("plano_trabalho_id")
-  aprovadorId      String              @map("aprovador_id")
-  omNivelId        String              @map("om_nivel_id")
-  dataAcao         DateTime            @default(now()) @map("data_acao")
-  createdAt        DateTime            @default(now()) @map("created_at")
-  aprovador        User                @relation(fields: [aprovadorId], references: [id])
-  planoTrabalho    PlanoTrabalho       @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
-  omNivel          OrganizacaoMilitar  @relation(fields: [omNivelId], references: [id])
+  nivelHierarquico Int                @map("nivel_hierarquico")
+  planoTrabalhoId  String             @map("plano_trabalho_id")
+  aprovadorId      String             @map("aprovador_id")
+  omNivelId        String             @map("om_nivel_id")
+  dataAcao         DateTime           @default(now()) @map("data_acao")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  aprovador        User               @relation(fields: [aprovadorId], references: [id])
+  planoTrabalho    PlanoTrabalho      @relation(fields: [planoTrabalhoId], references: [id], onDelete: Cascade)
+  omNivel          OrganizacaoMilitar @relation(fields: [omNivelId], references: [id])
 
   @@index([aprovadorId])
   @@index([dataAcao])
@@ -277,20 +278,20 @@ model OperacaoOM {
 }
 
 model OrganizacaoMilitar {
-  id                     String                @id @default(cuid())
+  id                     String               @id @default(cuid())
   nome                   String
   sigla                  String
   tipo                   TipoOM
-  codUG                  String                @unique @map("cod_ug")
-  omPaiId                String?               @map("om_pai_id")
-  createdAt              DateTime              @default(now()) @map("created_at")
-  updatedAt              DateTime              @updatedAt @map("updated_at")
+  codUG                  String?              @unique @map("cod_ug")
+  omPaiId                String?              @map("om_pai_id")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
   despesasOm             DespesaOM[]
   operacoes              Operacao[]
   operacoesParticipantes OperacaoOM[]
   planosTrabalho         PlanoTrabalho[]
-  omPai                  OrganizacaoMilitar?   @relation("OMHierarchy", fields: [omPaiId], references: [id], onDelete: Restrict)
-  omsFilhas              OrganizacaoMilitar[]  @relation("OMHierarchy")
+  omPai                  OrganizacaoMilitar?  @relation("OMHierarchy", fields: [omPaiId], references: [id], onDelete: Restrict)
+  omsFilhas              OrganizacaoMilitar[] @relation("OMHierarchy")
   users                  User[]
   aprovacoesHistorico    AprovacaoHistorico[]
 
